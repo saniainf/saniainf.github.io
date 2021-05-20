@@ -1,10 +1,12 @@
 {
+const screenWidth = window.screen.availWidth;
+const screenHeight = window.screen.availHeight;
 let c = document.createElement("canvas");
 let ctx = c.getContext("2d");
 c.width = document.documentElement.clientWidth;
 c.height = document.documentElement.clientHeight;
 document.body.appendChild(c);
-let dots = new Array(100);
+let dots = new Array(Math.floor(screenWidth * screenHeight / 7000));
 
 function getRandomInt(max) {
     return Math.floor(Math.random() * max);
@@ -22,18 +24,15 @@ function distancePow2(leftX, leftY, rightX, rightY){
 
 class Dot {
     constructor() {
-        this.x = getRandomInt(c.width);
-        this.y = getRandomInt(c.height);
+        this.x = getRandomInt(screenWidth);
+        this.y = getRandomInt(screenHeight);
         this.dirX = getRandomArbitrary(-1, 1);
         this.dirY = getRandomArbitrary(-1, 1);
     }
 }
-fillDots();
-function fillDots(){
-    dots.length = Math.floor(c.width / c.height * 100);
-    for (let i = 0; i < dots.length; i++) {
-        dots[i] = new Dot();
-    }
+  
+for (let i = 0; i < dots.length; i++) {
+    dots[i] = new Dot();
 }
 
 document.onmousemove = handleMouseMove;
@@ -62,12 +61,14 @@ function handleMouseMove(event) {
 window.addEventListener('resize', function(event) {
     c.width = document.documentElement.clientWidth;
     c.height = document.documentElement.clientHeight;
-    fillDots();
 }, true);
 
 let speed = 1;
 function loop(){
-    ctx.fillStyle = "#c9def2";
+    let gradient = ctx.createLinearGradient(0, 0, 0, c.height);
+    gradient.addColorStop(0, '#a9def2');
+    gradient.addColorStop(1, '#f0f0f0');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, c.width, c.height);
     drawDots();
     drawLine();
@@ -78,7 +79,7 @@ function drawDots(){
     for (let i = 0; i < dots.length - 1; i++) {
         const dot = dots[i];
         
-        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
         ctx.beginPath();
         ctx.arc(dot.x, dot.y, 2, 0, Math.PI*2, true);
         ctx.fill();
@@ -86,10 +87,13 @@ function drawDots(){
         dot.x += dot.dirX * speed;
         dot.y += dot.dirY * speed;
 
-        if (dot.x > c.width) {dot.dirX = -(dot.dirX)};
-        if (dot.x < 0) {dot.dirX = Math.abs(dot.dirX)};
-        if (dot.y > c.height) {dot.dirY = -(dot.dirY)};
-        if (dot.y < 0) {dot.dirY = Math.abs(dot.dirY)};
+        let halfDiffWidth = (screenWidth - c.width) / 2;
+        let halfDiffHeight = (screenHeight - c.height) / 2;
+
+        if (dot.x > c.width + halfDiffWidth) {dot.dirX = -(dot.dirX)};
+        if (dot.x < -halfDiffWidth) {dot.dirX = Math.abs(dot.dirX)};
+        if (dot.y > c.height + halfDiffHeight) {dot.dirY = -(dot.dirY)};
+        if (dot.y < -halfDiffHeight) {dot.dirY = Math.abs(dot.dirY)};
     }
 }
 

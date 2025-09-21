@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>TableGen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./static/css/tablegen/tablegen.css" />
+</head>
+<body class="tablegen-page">
+  <h1 class="tablegen-title">TableGen</h1>
+  <p>Скопируйте диапазон ячеек в Excel и вставьте (Ctrl+V) на страницу. Затем нажмите кнопку экспорта для просмотра JSON в консоли.</p>
+
+  <div id="tablegen-root"></div>
+  <div class="hint">Экспорт появится в консоли браузера (F12 → Console).</div>
+
+  <script type="module">
+    import { initTableGen } from './static/js/tablegen/app/init.js';
+    // Инициализируем редактор таблицы в контейнере
+    initTableGen('tablegen-root');
+  </script>
+</body>
+</html>

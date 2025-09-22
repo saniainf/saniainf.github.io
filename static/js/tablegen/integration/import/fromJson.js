@@ -51,14 +51,9 @@ export function parseTableJson(jsonString) {
  * @param {import('../../core/events/EventBus.js').EventBus} bus
  */
 export function applyImportedDocument(model, doc, bus) {
-  // Для джуниора: мы не создаём новый объект модели, чтобы внешние ссылки (например из UI)
-  // оставались валидными. Просто перезаписываем поля.
-  model.version = doc.version || 1;
-  model.meta = { ...(doc.meta || { name: 'Imported' }) };
-  model.grid = { rows: doc.grid.rows, cols: doc.grid.cols };
-  model.cells = (doc.cells || []).map(c => ({ ...c }));
-  model._rebuildIndex();
-  // Сообщаем подписчикам что структура и содержимое изменилось
+  // Теперь используем публичный метод модели, чтобы не дублировать логику переноса полей.
+  // emitEvent:false — чтобы не создавать событие applyDocument (мы хотим пометить именно import).
+  model.applyDocument(doc, { emitEvent: false });
+  // Эмитим одно событие структуры с конкретной причиной 'import'.
   bus.emit('structure:change', { type: 'import' });
-  bus.emit('paste', { import: true }); // используем существующий рендер-триггер
 }

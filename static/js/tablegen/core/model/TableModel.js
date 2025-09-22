@@ -43,7 +43,8 @@ export class TableModel {
   constructor(doc, eventBus) {
     this.version = doc.version || 1;
     this.meta = { ...doc.meta };
-    this.grid = { rows: doc.grid.rows, cols: doc.grid.cols };
+  // Добавляем поддержку количества строк пользовательской шапки (headerRows)
+  this.grid = { rows: doc.grid.rows, cols: doc.grid.cols, headerRows: doc.grid.headerRows ? doc.grid.headerRows : 0 };
     // Клонируем ячейки, чтобы избежать мутаций исходного объекта
     this.cells = (doc.cells || []).map(c => ({ ...c }));
     this.bus = eventBus;
@@ -80,6 +81,30 @@ export class TableModel {
     if (changed) {
       this.bus?.emit('structure:change', { type: 'resize', rows: this.grid.rows, cols: this.grid.cols });
     }
+  }
+
+  /**
+   * Установить количество строк пользовательской шапки (должно быть в пределах 0..rows).
+   * Эти строки будут визуально рендериться в секции thead (после строки нумерации столбцов).
+   * @param {number} count
+   */
+  setHeaderRows(count) {
+    const n = Math.max(0, Math.min(this.grid.rows, Number(count) || 0));
+    if (n === this.grid.headerRows) return;
+    this.grid.headerRows = n;
+    this.bus?.emit('structure:change', { type: 'headerRows', headerRows: n });
+  }
+
+  /**
+   * Установить имя таблицы (meta.name). Пустое имя игнорируем, чтобы не затирать существующее случайно.
+   * @param {string} name
+   */
+  setTableName(name) {
+    const newName = (name || '').trim();
+    if (!newName || newName === this.meta.name) return;
+    const oldName = this.meta.name;
+    this.meta.name = newName;
+    this.bus?.emit('structure:change', { type: 'meta', field: 'name', oldValue: oldName, newValue: newName });
   }
 
   /**
@@ -145,7 +170,7 @@ export class TableModel {
     return {
       version: this.version,
       meta: { ...this.meta },
-      grid: { ...this.grid },
+  grid: { rows: this.grid.rows, cols: this.grid.cols, headerRows: this.grid.headerRows || 0 },
       cells: this.cells
         .filter(c => c.rowSpan !== 1 || c.colSpan !== 1 || c.value !== '' || (c.classes && c.classes.length) || (c.data && Object.keys(c.data).length))
         .map(c => ({ ...c }))
@@ -159,5 +184,33 @@ export class TableModel {
   clone() {
     const doc = JSON.parse(JSON.stringify(this.toJSON()));
     return new TableModel(doc, this.bus);
+  }
+
+  /**
+   * Применяет переданный документ (snapshot) к текущей модели IN-PLACE, не меняя ссылку на объект.
+   * Для джуниора: это важно, потому что остальные сервисы (renderer, selectionService и т.д.)
+   * держат ссылки на текущий экземпляр модели. Если бы мы сделали new TableModel(), пришлось бы
+   * обновлять ссылки повсюду. Здесь мы просто перезаписываем поля.
+   * @param {TableDocument} doc Документ из истории / импорта
+   * @param {Object} [opts]
+   * @param {boolean} [opts.emitEvent=true] Эмитить ли событие structure:change после применения
+   * @returns {boolean} Успех применения
+   */
+  applyDocument(doc, opts = {}) {
+    const { emitEvent = true } = opts;
+    if (!doc || !doc.grid || typeof doc.grid.rows !== 'number' || typeof doc.grid.cols !== 'number') {
+      console.error('[TableModel.applyDocument] Некорректный документ', doc);
+      return false;
+    }
+    // Переносим базовые поля. Клонируем, чтобы избежать непреднамеренных мутаций исходного doc.
+    this.version = doc.version || this.version || 1;
+    this.meta = doc.meta ? { ...doc.meta } : {};
+  this.grid = { rows: doc.grid.rows, cols: doc.grid.cols, headerRows: doc.grid.headerRows ? doc.grid.headerRows : 0 };
+    this.cells = Array.isArray(doc.cells) ? doc.cells.map(c => ({ ...c })) : [];
+    this._rebuildIndex();
+    if (emitEvent) {
+      this.bus?.emit('structure:change', { type: 'applyDocument' });
+    }
+    return true;
   }
 }

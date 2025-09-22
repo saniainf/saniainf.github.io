@@ -25,11 +25,69 @@ h1.tablegen-title {
   min-width: 40px;
 }
 
+/* Заголовки (столбцы и строки) */
+.tablegen-basic-table th {
+  border: 1px solid #888;
+  background: #f2f2f2;
+  padding: 4px 6px;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+  user-select: none; /* Чтобы случайно не выделять при манипуляциях */
+  position: sticky; /* Возможность в будущем фиксировать */
+  top: 0; /* Для thead */
+  z-index: 2;
+}
+
+/* Левый столбец заголовков строк — можно кастомизировать отдельно */
+.tablegen-basic-table th.tablegen-row-header {
+  text-align: right;
+  width: 32px;
+  background: #ededed;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.tablegen-basic-table th.tablegen-header-corner {
+  background: #e0e0e0;
+  position: sticky;
+  left: 0;
+  z-index: 3; /* Выше строковых чтобы перекрывать границы */
+}
+
+.tablegen-basic-table th.tablegen-col-header {
+  min-width: 40px;
+}
+
+/* Пользовательские строки шапки (дублируемые в thead) */
+/* Пользовательские строки шапки (headerRows). Теперь их содержимые ячейки редактируемы (td с data-r/data-c).
+   Этот стиль применяется к левой нумерационной ячейке шапки. Делает фон чуть серым и шрифт жирным для визуального отделения. */
+.tablegen-basic-table th.tablegen-user-header-corner {
+  background: #efefef;
+  font-weight: 700;
+}
+
+/* Все редактируемые ячейки пользовательской шапки (td в thead, кроме первой нумерационной колонки) — унифицируем фон и толщину шрифта */
+.tablegen-basic-table thead tr:not(:first-child) td[data-r] {
+  /* Фон вынесен в отдельное правило с :not, чтобы не перебивать выделение (selected / range) по специфичности */
+  font-weight: 600;
+}
+/* Применяем базовый серый фон только если ячейка НЕ выделена и НЕ входит в диапазон */
+.tablegen-basic-table thead tr:not(:first-child) td[data-r]:not(.tablegen-selected-cell):not(.tablegen-range-cell) {
+  background: #f5f5f5;
+}
+
 /* Выделенная ячейка (одиночный клик) */
+/* Выделенная ячейка (одиночный выбор). Раньше использовался outline, теперь оставляем только мягкий фон.
+   Фон единый для шапки и тела таблицы. */
 .tablegen-basic-table td.tablegen-selected-cell {
-  outline: 2px solid #1976d2;
-  outline-offset: -2px;
   background: #eef6ff;
+}
+/* В шапке фон был плохо заметен из-за базового серого. Делаем чуть насыщеннее и добавляем внутреннюю тень. */
+.tablegen-basic-table thead td.tablegen-selected-cell {
+  /* Чуть более насыщенный голубой чем в теле (теле #eef6ff) */
+  background: #d9eaff;
 }
 
 button.tablegen-btn {
@@ -42,16 +100,13 @@ button.tablegen-btn {
   margin-top: 8px;
 }
 
-/* Стили для диапазонного выделения с четкими границами и полупрозрачным фоном */
+/* Диапазонное выделение: убрали рамки, делаем более заметный единый фон.
+   Один стиль и для thead, и для tbody, чтобы поведение было предсказуемым. */
 .tablegen-basic-table td.tablegen-range-cell {
-  background: rgba(25,118,210,0.15); /* светло-синий прозрачный фон */
-  position: relative; /* для псевдоэлементов если понадобится */
+  background: rgba(25,118,210,0.28);
 }
-
-/* Границы периметра диапазона — отдельными классами чтобы не конфликтовать с outline одиночного выбора */
-.tablegen-basic-table td.tablegen-range-border-top { box-shadow: 0 2px 0 -1px #1976d2 inset; }
-.tablegen-basic-table td.tablegen-range-border-bottom { box-shadow: 0 -2px 0 -1px #1976d2 inset; }
-.tablegen-basic-table td.tablegen-range-border-left { box-shadow: 2px 0 0 -1px #1976d2 inset; }
-.tablegen-basic-table td.tablegen-range-border-right { box-shadow: -2px 0 0 -1px #1976d2 inset; }
-
-/* При пересечении нескольких сторон тени суммируются — приемлемо. */
+/* Для шапки усиливаем ещё немного насыщенность чтобы не терялось на #f5f5f5 */
+.tablegen-basic-table thead td.tablegen-range-cell {
+  /* Чуть темнее чем в теле, без рамок */
+  background: rgba(25,118,210,0.34);
+}

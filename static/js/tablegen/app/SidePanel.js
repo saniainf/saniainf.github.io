@@ -74,6 +74,52 @@ export class SidePanel {
     title.style.marginBottom = '6px';
     panel.appendChild(title);
 
+    // --- Общие параметры таблицы: имя и количество строк шапки ---
+    const metaWrap = document.createElement('div');
+    metaWrap.style.display = 'flex';
+    metaWrap.style.flexWrap = 'wrap';
+    metaWrap.style.gap = '6px';
+    metaWrap.style.marginBottom = '8px';
+
+    // Поле для имени таблицы
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = 'Имя:';
+    nameLabel.style.fontSize = '12px';
+    nameLabel.style.display = 'flex';
+    nameLabel.style.flexDirection = 'column';
+    nameLabel.style.gap = '2px';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Название таблицы';
+    nameInput.value = this.model.meta?.name || '';
+    nameInput.style.width = '160px';
+    nameInput.addEventListener('change', () => {
+      this.model.setTableName(nameInput.value);
+    });
+    nameLabel.appendChild(nameInput);
+
+    // Поле для количества строк шапки
+    const headerLabel = document.createElement('label');
+    headerLabel.textContent = 'Строк шапки:';
+    headerLabel.style.fontSize = '12px';
+    headerLabel.style.display = 'flex';
+    headerLabel.style.flexDirection = 'column';
+    headerLabel.style.gap = '2px';
+    const headerInput = document.createElement('input');
+    headerInput.type = 'number';
+    headerInput.min = '0';
+    headerInput.step = '1';
+    headerInput.style.width = '80px';
+    headerInput.value = String(this.model.grid.headerRows || 0);
+    headerInput.addEventListener('change', () => {
+      this.model.setHeaderRows(parseInt(headerInput.value, 10) || 0);
+    });
+    headerLabel.appendChild(headerInput);
+
+    metaWrap.appendChild(nameLabel);
+    metaWrap.appendChild(headerLabel);
+    panel.appendChild(metaWrap);
+
     this.selectedInfoEl = document.createElement('div');
     this.selectedInfoEl.textContent = 'Ячейка не выбрана';
     this.selectedInfoEl.style.marginBottom = '6px';
@@ -108,14 +154,16 @@ export class SidePanel {
       const name = classInput.value.trim();
       if (!name) return; // пустые игнорируем
       let changed = false;
-      this._forEachLeadCellInRange((cell, r, c) => {
-        const current = cell.classes ? [...cell.classes] : [];
-        // Валидация для каждой ячейки отдельно — может отклониться только для неё.
-        const validation = this.validator.canAddClass(current, name);
-        if (!validation.ok) return; // пропускаем только эту ячейку
-        current.push(name);
-        this.model.setCellClasses(r, c, current);
-        changed = true;
+      // Оборачиваем серию событий в batch чтобы избежать каскада render() (через scheduler) на каждую ячейку.
+      this.bus.batch(() => {
+        this._forEachLeadCellInRange((cell, r, c) => {
+          const current = cell.classes ? [...cell.classes] : [];
+          const validation = this.validator.canAddClass(current, name);
+          if (!validation.ok) return;
+          current.push(name);
+          this.model.setCellClasses(r, c, current);
+          changed = true;
+        });
       });
       if (changed) {
         this.refresh();
@@ -147,16 +195,17 @@ export class SidePanel {
         chip.style.padding = '2px 6px';
         chip.style.cursor = 'pointer';
         chip.addEventListener('click', () => {
-          // Удаляем класс из всех ведущих ячеек диапазона / или одной выбранной.
-            let removedAny = false;
+          let removedAny = false;
+          this.bus.batch(() => {
             this._forEachLeadCellInRange((cell, r, c) => {
               const current = cell.classes ? [...cell.classes] : [];
-              if (!current.includes(cls)) return; // нет класса — пропускаем
+              if (!current.includes(cls)) return;
               const filtered = current.filter(x => x !== cls);
               this.model.setCellClasses(r, c, filtered);
               removedAny = true;
             });
-            if (removedAny) this.refresh();
+          });
+          if (removedAny) this.refresh();
         });
         this.classListEl.appendChild(chip);
       }
@@ -200,19 +249,19 @@ export class SidePanel {
       if (!this.validator.validateDataKey(key)) { console.warn('Недопустимый формат ключа'); return; }
       const value = dataValInput.value; // пустая строка допустима
       let changed = false;
-      this._forEachLeadCellInRange((cell, r, c) => {
-        const current = cell.data ? { ...cell.data } : {};
-        // Валидация добавления (если ключа нет) — если ключ уже есть, canAddDataAttribute можно не звать, но оставим универсально.
-        if (!(key in current)) {
-          const validation = this.validator.canAddDataAttribute(current, key, value);
-          if (!validation.ok) return; // пропускаем только конкретную ячейку
-        }
-        // Присваиваем / обновляем
-        if (current[key] !== value) {
-          current[key] = value;
-          this.model.setCellData(r, c, current);
-          changed = true;
-        }
+      this.bus.batch(() => {
+        this._forEachLeadCellInRange((cell, r, c) => {
+          const current = cell.data ? { ...cell.data } : {};
+          if (!(key in current)) {
+            const validation = this.validator.canAddDataAttribute(current, key, value);
+            if (!validation.ok) return;
+          }
+            if (current[key] !== value) {
+              current[key] = value;
+              this.model.setCellData(r, c, current);
+              changed = true;
+            }
+        });
       });
       if (changed) {
         // Не очищаем выделение — SidePanel.refresh() перерисует список, а диапазон восстановится через reapplyRange (будет добавлен).
@@ -246,14 +295,15 @@ export class SidePanel {
         const valInput = document.createElement('input'); valInput.type = 'text'; valInput.value = obj[k]; valInput.style.width = '140px';
         const delBtn = document.createElement('button'); delBtn.textContent = '×'; delBtn.title = 'Удалить атрибут';
         delBtn.addEventListener('click', () => {
-          // Удаляем этот data-* ключ из всех ячеек диапазона / или одной выбранной.
           let removed = false;
-          this._forEachLeadCellInRange((cell, r, c) => {
-            const copy = cell.data ? { ...cell.data } : {};
-            if (!(k in copy)) return; // нет ключа — пропускаем
-            delete copy[k];
-            this.model.setCellData(r, c, copy);
-            removed = true;
+          this.bus.batch(() => {
+            this._forEachLeadCellInRange((cell, r, c) => {
+              const copy = cell.data ? { ...cell.data } : {};
+              if (!(k in copy)) return;
+              delete copy[k];
+              this.model.setCellData(r, c, copy);
+              removed = true;
+            });
           });
           if (removed) this.refresh();
         });
@@ -266,15 +316,17 @@ export class SidePanel {
             keyInput.value = k; return; }
           if (newKey === k) return; // не изменили
           let renamed = false;
+          this.bus.batch(() => {
             this._forEachLeadCellInRange((cell, r, c) => {
               if (!cell.data) return;
-              if (!(k in cell.data)) return; // в этой ячейке ключа нет
-              if (newKey in cell.data) return; // конфликт — пропускаем
+              if (!(k in cell.data)) return;
+              if (newKey in cell.data) return;
               const copy = { ...cell.data };
               copy[newKey] = copy[k]; delete copy[k];
               this.model.setCellData(r, c, copy);
               renamed = true;
             });
+          });
           if (!renamed) {
             // Если не смогли ни в одной ячейке — откатываем поле ввода.
             keyInput.value = k;
@@ -285,11 +337,13 @@ export class SidePanel {
         valInput.addEventListener('change', () => {
           // Изменяем значение data-* ключа у всех ячеек диапазона, в которых этот ключ существует.
           const newVal = valInput.value;
-          this._forEachLeadCellInRange((cell, r, c) => {
-            if (!cell.data || !(k in cell.data)) return;
-            const copy = { ...cell.data };
-            copy[k] = newVal;
-            this.model.setCellData(r, c, copy);
+          this.bus.batch(() => {
+            this._forEachLeadCellInRange((cell, r, c) => {
+              if (!cell.data || !(k in cell.data)) return;
+              const copy = { ...cell.data };
+              copy[k] = newVal;
+              this.model.setCellData(r, c, copy);
+            });
           });
         });
         keyTd.appendChild(keyInput); valTd.appendChild(valInput); delTd.appendChild(delBtn);

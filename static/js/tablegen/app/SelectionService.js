@@ -39,13 +39,14 @@ export class SelectionService {
   }
 
   /**
-   * Выбрать ячейку по DOM td
-   * @param {HTMLTableCellElement} td
+   * Выбрать ячейку по DOM элементу (td/любая ячейка с data-r,data-c).
+   * Старое имя selectByTd оставлено для обратной совместимости вызовов из других модулей.
+   * @param {HTMLElement} el
    */
-  selectByTd(td) {
-    if (!td) return;
-    const r = parseInt(td.dataset.r, 10);
-    const c = parseInt(td.dataset.c, 10);
+  selectByTd(el) { // обратная совместимость
+    if (!el) return;
+    const r = parseInt(el.dataset.r, 10);
+    const c = parseInt(el.dataset.c, 10);
     if (Number.isNaN(r) || Number.isNaN(c)) return;
     this.select(r, c);
   }
@@ -108,10 +109,12 @@ export class SelectionService {
   }
 
   /**
-   * Внутренний поиск td по координатам
+   * Внутренний поиск элемента ячейки по координатам.
+   * Раньше мы искали только td, но после добавления редактируемых ячеек в шапке
+   * (которые теперь тоже имеют data-r / data-c) достаточно искать любой элемент с этими data-атрибутами.
    */
   _findCellElement(r, c) {
-    return this.renderer.tableEl.querySelector(`td[data-r="${r}"][data-c="${c}"]`);
+    return this.renderer.tableEl.querySelector(`[data-r="${r}"][data-c="${c}"]`);
   }
 
   /** Начать выделение диапазона (anchor) */

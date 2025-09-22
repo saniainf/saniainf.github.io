@@ -159,7 +159,11 @@ export class ValidationService {
       return { ok: false, error: 'Диапазон выходит за границы таблицы' };
     }
 
-    // Проверка пересечений с существующими merge
+  // Проверка пересечений с существующими merge
+  // Допустимы ДВА сценария пересечения:
+  //  1) Наш новый диапазон ПОЛНОСТЬЮ ПОГЛОЩАЕТ существующую merge-область (поглощение) — ок (расширяем / заменяем область).
+  //  2) Наш новый диапазон ПОЛНОСТЬЮ НАХОДИТСЯ ВНУТРИ существующей merge-области (вложенный) — ок (no-op с точки зрения структуры, mergeRange ничего не изменит).
+  // Любое частичное перекрытие (когда прямоугольники пересекаются, но ни один не содержит другой целиком) — запрещено.
     for (const cell of this.model.cells) {
       if (!cell.rowSpan && !cell.colSpan) continue; // Не merge-ячейка
       
@@ -173,13 +177,16 @@ export class ValidationService {
       const overlapsC = !(maxC < cell.c || minC > cellMaxC);
 
       if (overlapsR && overlapsC) {
-        // Частичное пересечение недопустимо, полное поглощение - ок
-        const fullyContained = 
-          minR <= cell.r && maxR >= cellMaxR && 
+        const newContainsExisting =
+          minR <= cell.r && maxR >= cellMaxR &&
           minC <= cell.c && maxC >= cellMaxC;
-        
-        if (!fullyContained) {
-          return { ok: false, error: `Конфликт с существующим merge в (${cell.r},${cell.c})` };
+        const existingContainsNew =
+          cell.r <= minR && cellMaxR >= maxR &&
+          cell.c <= minC && cellMaxC >= maxC;
+
+        if (!(newContainsExisting || existingContainsNew)) {
+          // Частичное пересечение (ни один не содержит другой полностью) — ошибка
+            return { ok: false, error: `Конфликт с существующим merge в (${cell.r},${cell.c})` };
         }
       }
     }

@@ -12,11 +12,15 @@ export class InlineEditor {
    * @param {HistoryService} history История (в будущем для snapshot перед редактированием)
    * @param {SelectionService} selectionService Сервис выбора ячеек
    */
-  constructor(model, tableRenderer, history, selectionService) {
+  constructor(model, tableRenderer, history, selectionService, scheduler, bus) {
     this.model = model;
     this.tableRenderer = tableRenderer;
     this.history = history;
     this.selectionService = selectionService;
+    // Сохраняем ссылку на RenderScheduler, чтобы вызывать отложенный рендер вместо прямого render().
+    this.scheduler = scheduler;
+    // Шина событий нужна для генерации событий жизненного цикла редактирования
+    this.bus = bus;
     this.activeEditor = null; // {input, td, r, c, oldValue}
     this.justFinishedEditing = false; // Флаг для предотвращения немедленного повторного редактирования
     this._bindEvents();
@@ -29,9 +33,9 @@ export class InlineEditor {
     const tbl = this.tableRenderer.tableEl;
     // Двойной клик — начать редактирование (выбор уже должен быть сделан SelectionService по клику)
     tbl.addEventListener('dblclick', (e) => {
-      const td = e.target.closest('td');
+      // Теперь шапочные ячейки тоже отмечены data-r / data-c и могут быть td
+      const td = e.target.closest('[data-r][data-c]');
       if (!td || !tbl.contains(td)) return;
-      // Убедимся, что сервис знает об этой ячейке (если пользователь сразу двойным кликом)
       this.selectionService.selectByTd(td);
       this.beginEditFromSelection();
     });
@@ -58,7 +62,7 @@ export class InlineEditor {
   beginEditFromSelection() {
     const sel = this.selectionService.getSelected();
     if (!sel) return;
-    const td = this.tableRenderer.tableEl.querySelector(`td[data-r="${sel.r}"][data-c="${sel.c}"]`);
+  const td = this.tableRenderer.tableEl.querySelector(`[data-r="${sel.r}"][data-c="${sel.c}"]`);
     if (!td) return;
     this.beginEdit(td);
   }
@@ -68,7 +72,7 @@ export class InlineEditor {
    * @param {HTMLTableCellElement} td DOM элемент ячейки
    */
   beginEdit(td) {
-    if (this.activeEditor) return; // Уже редактируем другую
+  if (this.activeEditor) return; // Уже редактируем другую
     const r = parseInt(td.dataset.r, 10);
     const c = parseInt(td.dataset.c, 10);
     if (Number.isNaN(r) || Number.isNaN(c)) return;
@@ -77,7 +81,7 @@ export class InlineEditor {
     const cell = this.model.getCell(r, c);
     const oldValue = cell ? cell.value : '';
 
-    const input = document.createElement('input');
+  const input = document.createElement('input');
     input.type = 'text';
     input.className = 'tablegen-edit-input';
     input.value = oldValue;
@@ -91,6 +95,10 @@ export class InlineEditor {
   // Для расширения: добавим позже сюда ссылки на commit / cancel, чтобы можно было инициировать
   // завершение редактирования извне (например при клике по другой ячейке).
   this.activeEditor = { input, td, r, c, oldValue, commit: null, cancel: null };
+    // Эмитим событие начала редактирования (для аналитики / интеграций)
+    if (this.bus) {
+      this.bus.emit('edit:start', { r, c, oldValue });
+    }
     // ВАЖНО: объявляем cleanup ДО commit/cancel, иначе обращение к ней из commit приведёт к ReferenceError
     const cleanup = () => {
       input.removeEventListener('keydown', onKey);
@@ -98,18 +106,20 @@ export class InlineEditor {
       this.activeEditor = null;
     };
 
-    const reselectAfterRender = () => {
-      // Для джуниора: rAF ждёт окончания перерисовки layout, затем мы просто пере-применяем выбор.
-      requestAnimationFrame(() => this.selectionService.reapplySelection());
-    };
+    // После интеграции RenderScheduler восстановление выделения делается централизованно.
+    // Поэтому отдельная функция reselectAfterRender больше не нужна.
     const commit = () => {
       if (!this.activeEditor) return;
       const { r, c, oldValue, input } = this.activeEditor;
       const newValue = input.value;
       if (newValue !== oldValue) this.model.setCellValue(r, c, newValue);
       cleanup();
-      this.tableRenderer.render();
-      reselectAfterRender();
+  // Планируем один рендер на кадр через scheduler
+  this.scheduler.request();
+      // Эмитим событие commit
+      if (this.bus) {
+        this.bus.emit('edit:commit', { r, c, oldValue, newValue });
+      }
       
       // Устанавливаем флаг, что мы только что закончили редактирование
       // Это предотвратит немедленное повторное редактирование от глобального Enter
@@ -120,8 +130,11 @@ export class InlineEditor {
     const cancel = () => {
       if (!this.activeEditor) return;
       cleanup();
-      this.tableRenderer.render();
-      reselectAfterRender();
+  this.scheduler.request();
+      // Эмитим событие cancel
+      if (this.bus) {
+        this.bus.emit('edit:cancel', { r, c, oldValue });
+      }
       
       // Устанавливаем флаг, что мы только что закончили редактирование
       // Это предотвратит немедленное повторное редактирование от глобального Enter
@@ -164,8 +177,13 @@ export class InlineEditor {
    */
   cancelIfAny() {
     if (this.activeEditor) {
+      // Если есть активный редактор — трактуем это как отмену (без commit значения)
+      const { r, c, oldValue } = this.activeEditor;
       this.activeEditor = null;
-      this.tableRenderer.render();
+      this.scheduler.request();
+      if (this.bus) {
+        this.bus.emit('edit:cancel', { r, c, oldValue });
+      }
     }
   }
 

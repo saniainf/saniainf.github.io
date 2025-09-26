@@ -8,15 +8,18 @@
 </head>
 <body class="tablegen-page">
   <h1 class="tablegen-title">TableGen</h1>
-  <p>Скопируйте диапазон ячеек в Excel и вставьте (Ctrl+V) на страницу. Затем нажмите кнопку экспорта для просмотра JSON в консоли.</p>
+  <p>Скопируйте диапазон ячеек в Excel и вставьте кнопкой "Вставить из буфера" на страницу. Затем нажмите кнопку экспорта для просмотра JSON в консоли.</p>
 
   <div id="tablegen-root"></div>
   <div class="hint">Экспорт появится в консоли браузера (F12 → Console).</div>
 
   <script type="module">
     import { initTableGen } from './static/js/tablegen/app/init.js';
-    // Инициализируем редактор таблицы в контейнере
-    initTableGen('tablegen-root');
+    // Подключаем проектный реестр отдельно, чтобы можно было переиспользовать базовый код на разных страницах.
+    // На других страницах можно импортировать другой файл project registry или вообще не подключать его (будет только core).
+    import { PROJECT_REGISTRY } from './static/js/tablegen/config/registry.project.js';
+    // Инициализируем редактор, передавая projectRegistry (core сливается автоматически внутри init).
+    initTableGen('tablegen-root', { projectRegistry: PROJECT_REGISTRY });
   </script>
 </body>
 </html>

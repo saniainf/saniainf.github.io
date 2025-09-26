@@ -15,6 +15,12 @@ export class ValidationService {
    */
   constructor(model) {
     this.model = model;
+    // Реестр будет установлен через initRegistry
+    this._registry = null;          // исходный объект реестра
+    this._classSet = new Set();      // множество допустимых классов
+    this._exclusiveGroups = new Map(); // карта: className -> exclusiveGroup
+    this._attrMap = new Map();       // карта: attrName -> метаданные
+    this._strict = true;             // STRICT политика импорта/валидации
   }
 
   /**
@@ -41,6 +47,11 @@ export class ValidationService {
       const cellErrors = this.validateCell(cell, doc.grid);
       if (cellErrors.length > 0) {
         errors.push(`Ячейка ${i}: ${cellErrors.join(', ')}`);
+      }
+      // Дополнительная STRICT проверка по реестру (если он инициализирован)
+      if (this._registry) {
+        const regErrors = this._validateCellRegistry(cell);
+        if (regErrors.length) errors.push(`Ячейка ${i} (registry): ${regErrors.join(', ')}`);
       }
     }
 
@@ -108,6 +119,146 @@ export class ValidationService {
     }
 
     return errors;
+  }
+
+  /**
+   * Инициализация реестра допустимых классов и атрибутов.
+   * STRICT политика: любое неизвестное значение считается ошибкой при валидации документов/импорта.
+   * @param {Object} registry Объект TABLEGEN_REGISTRY
+   */
+  initRegistry(registry) {
+    this._registry = registry;
+    this._classSet.clear();
+    this._exclusiveGroups.clear();
+    this._attrMap.clear();
+    if (!registry) return;
+    if (registry.classes) {
+      for (const cls of registry.classes) {
+        this._classSet.add(cls.name);
+        if (cls.exclusiveGroup) this._exclusiveGroups.set(cls.name, cls.exclusiveGroup);
+      }
+    }
+    if (registry.dataAttributes) {
+      for (const a of registry.dataAttributes) {
+        this._attrMap.set(a.name, a);
+      }
+    }
+    if (registry.rules && registry.rules.importPolicy === 'strict') {
+      this._strict = true; // сейчас только strict
+    }
+  }
+
+  /**
+   * Валидация ячейки относительно реестра (классы + data-* значения).
+   * @param {Object} cell
+   * @returns {string[]} ошибки
+   */
+  _validateCellRegistry(cell) {
+    const errors = [];
+    // Проверка классов
+    if (cell.classes) {
+      for (const cls of cell.classes) {
+        if (!this._classSet.has(cls)) errors.push(`неизвестный класс: ${cls}`);
+      }
+      // Проверка exclusiveGroup конфликтов (оставляем последний при нормализации — здесь только репорт)
+      const groupChosen = new Map(); // group -> className
+      for (const cls of cell.classes) {
+        const grp = this._exclusiveGroups.get(cls);
+        if (!grp) continue;
+        if (groupChosen.has(grp)) {
+          errors.push(`конфликт exclusiveGroup '${grp}' между '${groupChosen.get(grp)}' и '${cls}'`);
+        } else {
+          groupChosen.set(grp, cls);
+        }
+      }
+    }
+    // Проверка data-атрибутов
+    if (cell.data) {
+      for (const key of Object.keys(cell.data)) {
+        const meta = this._attrMap.get(key);
+        if (!meta) {
+          errors.push(`неизвестный data-атрибут: ${key}`);
+          continue;
+        }
+        const val = cell.data[key];
+        if (!this._validateAttributeValue(meta, val)) {
+          errors.push(`недопустимое значение '${val}' для ${key}`);
+        }
+      }
+    }
+    return errors;
+  }
+
+  /**
+   * Проверка значения атрибута согласно его метаданным.
+   * @param {Object} meta метаданные (type, values, min, max, default)
+   * @param {any} raw значение из документа (строка или число)
+   * @returns {boolean}
+   */
+  _validateAttributeValue(meta, raw) {
+    if (meta.type === 'enum') {
+      return meta.values.includes(raw);
+    }
+    if (meta.type === 'number') {
+      if (typeof raw !== 'number') return false;
+      if (meta.min != null && raw < meta.min) return false;
+      if (meta.max != null && raw > meta.max) return false;
+      return true;
+    }
+    if (meta.type === 'boolean') {
+      return typeof raw === 'boolean';
+    }
+    return false; // других типов нет (string исключён по требованиям)
+  }
+
+  /**
+   * Нормализация списка классов с учётом exclusiveGroup: сохраняем последний встретившийся в группе.
+   * @param {string[]} classes входной список
+   * @returns {string[]} нормализованный список
+   */
+  normalizeClassList(classes) {
+    if (!Array.isArray(classes)) return [];
+    const byGroup = new Map(); // group -> className
+    const result = [];
+    for (const cls of classes) {
+      if (!this._classSet.has(cls)) continue; // пропускаем неизвестные
+      const grp = this._exclusiveGroups.get(cls);
+      if (!grp) {
+        result.push(cls);
+      } else {
+        byGroup.set(grp, cls); // последний перезапишет предыдущий
+      }
+    }
+    // Добавляем эксклюзивные группы в конец (порядок не критичен)
+    for (const cls of byGroup.values()) result.push(cls);
+    return result;
+  }
+
+  /**
+   * Проверка + приведение значения атрибута (используется при UI применении).
+   * @param {string} name имя атрибута
+   * @param {any} value значение
+   * @returns {{ok:boolean, value?:any, error?:string}}
+   */
+  validateAttribute(name, value) {
+    const meta = this._attrMap.get(name);
+    if (!meta) return { ok: false, error: 'Неизвестный атрибут' };
+    if (!this._validateAttributeValue(meta, value)) return { ok: false, error: 'Недопустимое значение' };
+    return { ok: true, value };
+  }
+
+  /**
+   * Доступные классы (для UI)
+   */
+  listAllowedClasses() {
+    return this._registry ? this._registry.classes.slice() : [];
+  }
+
+  /**
+   * Доступные атрибуты (для UI)
+   */
+  listAllowedAttributes() {
+    return this._registry ? this._registry.dataAttributes.slice() : [];
   }
 
   /**

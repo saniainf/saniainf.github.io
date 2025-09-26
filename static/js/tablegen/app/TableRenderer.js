@@ -76,6 +76,39 @@ export class TableRenderer {
     }
     this.thead.appendChild(numberingRow);
 
+    // --- Строка инпутов размеров столбцов ---
+    const sizesRow = document.createElement('tr');
+    const sizesCorner = document.createElement('th');
+    sizesCorner.className = 'tablegen-header-corner';
+    sizesCorner.textContent = 'W';
+    sizesRow.appendChild(sizesCorner);
+    for (let c = 0; c < model.grid.cols; c++) {
+      const th = document.createElement('th');
+      th.className = 'tablegen-col-header';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'tablegen-colsize-input';
+      input.dataset.colSizeInput = String(c);
+      input.style.width = '60px';
+      input.style.boxSizing = 'border-box';
+      input.style.fontSize = '11px';
+      input.style.padding = '2px 3px';
+      // Предзаполнение: если model.grid.columnSizes есть — выводим соответствующее значение
+      if (model.grid.columnSizes && model.grid.columnSizes[c]) {
+        const cs = model.grid.columnSizes[c];
+        input.value = cs.u === 'px' ? (cs.v + 'px') : String(cs.v);
+      } else {
+        input.value = '1'; // дефолт
+      }
+      input.addEventListener('change', () => {
+        // Передаём «сырой» ввод в модель
+        this.model.setColumnSize(c, input.value);
+      });
+      th.appendChild(input);
+      sizesRow.appendChild(th);
+    }
+    this.thead.appendChild(sizesRow);
+
   // --- Пользовательские строки шапки (headerRows) ---
   // Эти строки берутся из первых N строк данных модели и выводятся ТОЛЬКО в thead (не дублируются в tbody).
   // Таким образом тело содержит только «данные» после шапки.

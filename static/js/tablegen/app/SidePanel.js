@@ -14,15 +14,17 @@ export class SidePanel {
    * @param {EventBus} bus Шина событий
    * @param {ValidationService} validator Сервис валидации
    */
-  constructor(model, tableRenderer, selectionService, bus, validator) {
+  constructor(model, tableRenderer, selectionService, bus, validator, options = {}) {
     this.model = model;
     this.tableRenderer = tableRenderer;
     this.selectionService = selectionService;
     this.bus = bus;
     this.validator = validator;
     this.selectedCellRef = null; // {r,c}
-    this.rootEl = document.createElement('div');
-    this.rootEl.className = 'tablegen-side-panel';
+  this.rootEl = document.createElement('div');
+  // Базовый класс панели + модификатор горизонтального режима если включён
+  const horizontal = !!options.horizontal;
+  this.rootEl.className = 'tablegen-side-panel' + (horizontal ? ' tablegen-sidepanel-horizontal' : '');
     this._build();
     this._subscribeSelection();
   }
@@ -62,37 +64,23 @@ export class SidePanel {
   }
 
   _build() {
-    const panel = this.rootEl;
-    panel.style.border = '1px solid #ccc';
-    panel.style.padding = '8px';
-    panel.style.marginTop = '12px';
-    panel.style.maxWidth = '420px';
+  const panel = this.rootEl; // Основной контейнер теперь стилизуется через CSS классы
 
-    const title = document.createElement('div');
-    title.textContent = 'Редактор classes / data-*';
-    title.style.fontWeight = 'bold';
-    title.style.marginBottom = '6px';
-    panel.appendChild(title);
+    // Убрали общий заголовок панели по требованию — панель начинается сразу с мета-блока
 
     // --- Общие параметры таблицы: имя и количество строк шапки ---
-    const metaWrap = document.createElement('div');
-    metaWrap.style.display = 'flex';
-    metaWrap.style.flexWrap = 'wrap';
-    metaWrap.style.gap = '6px';
-    metaWrap.style.marginBottom = '8px';
+  const metaWrap = document.createElement('div');
+  metaWrap.className = 'tg-sp-meta'; // Теперь вертикальная колонка: Имя / Строк шапки / Выбрана ячейка
 
     // Поле для имени таблицы
     const nameLabel = document.createElement('label');
     nameLabel.textContent = 'Имя:';
-    nameLabel.style.fontSize = '12px';
-    nameLabel.style.display = 'flex';
-    nameLabel.style.flexDirection = 'column';
-    nameLabel.style.gap = '2px';
+  nameLabel.className = 'tg-sp-field';
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.placeholder = 'Название таблицы';
     nameInput.value = this.model.meta?.name || '';
-    nameInput.style.width = '160px';
+  nameInput.className = 'tg-sp-input tg-sp-input-text';
     nameInput.addEventListener('change', () => {
       this.model.setTableName(nameInput.value);
     });
@@ -101,15 +89,12 @@ export class SidePanel {
     // Поле для количества строк шапки
     const headerLabel = document.createElement('label');
     headerLabel.textContent = 'Строк шапки:';
-    headerLabel.style.fontSize = '12px';
-    headerLabel.style.display = 'flex';
-    headerLabel.style.flexDirection = 'column';
-    headerLabel.style.gap = '2px';
+  headerLabel.className = 'tg-sp-field';
     const headerInput = document.createElement('input');
     headerInput.type = 'number';
     headerInput.min = '0';
     headerInput.step = '1';
-    headerInput.style.width = '80px';
+  headerInput.className = 'tg-sp-input tg-sp-input-number';
     headerInput.value = String(this.model.grid.headerRows || 0);
     headerInput.addEventListener('change', () => {
       this.model.setHeaderRows(parseInt(headerInput.value, 10) || 0);
@@ -118,237 +103,208 @@ export class SidePanel {
 
     metaWrap.appendChild(nameLabel);
     metaWrap.appendChild(headerLabel);
+    // Блок информации о выбранной ячейке
+  const selWrap = document.createElement('div');
+  selWrap.className = 'tg-sp-field tg-sp-field-inline'; // одна линия: метка + значение
+  const selLabel = document.createElement('span'); selLabel.textContent = 'Выбрана:'; selLabel.className = 'tg-sp-selected-label';
+  const selValue = document.createElement('span'); selValue.textContent = 'нет'; selValue.className = 'tg-sp-selected-info';
+  selWrap.appendChild(selLabel); selWrap.appendChild(selValue);
+    metaWrap.appendChild(selWrap);
+    this.selectedInfoEl = selValue; // Сохраняем ссылку только на значение
     panel.appendChild(metaWrap);
 
-    this.selectedInfoEl = document.createElement('div');
-    this.selectedInfoEl.textContent = 'Ячейка не выбрана';
-    this.selectedInfoEl.style.marginBottom = '6px';
-    panel.appendChild(this.selectedInfoEl);
+    // Секция классов: обёртка + заголовок + контейнер
+    const classesSection = document.createElement('div');
+    classesSection.className = 'tg-sp-section';
+    const classesTitle = document.createElement('div');
+    classesTitle.textContent = 'CSS классы (выбор):';
+    classesTitle.className = 'tg-sp-section-title';
+    this.classControlsEl = document.createElement('div');
+    this.classControlsEl.className = 'tg-sp-classes-box';
+    classesSection.appendChild(classesTitle);
+    classesSection.appendChild(this.classControlsEl);
+    panel.appendChild(classesSection);
 
-    // ----- БЛОК КЛАССОВ -----
-    const classSectionTitle = document.createElement('div');
-    classSectionTitle.textContent = 'CSS классы:';
-    classSectionTitle.style.marginTop = '4px';
-    panel.appendChild(classSectionTitle);
+    // Секция атрибутов: обёртка + заголовок + контейнер
+    const attrsSection = document.createElement('div');
+    attrsSection.className = 'tg-sp-section';
+    const attrsTitle = document.createElement('div');
+    attrsTitle.textContent = 'data-* атрибуты (вкл/выкл):';
+    attrsTitle.className = 'tg-sp-section-title';
+    this.attrControlsEl = document.createElement('div');
+    this.attrControlsEl.className = 'tg-sp-attrs-box';
+    attrsSection.appendChild(attrsTitle);
+    attrsSection.appendChild(this.attrControlsEl);
+    panel.appendChild(attrsSection);
 
-    this.classListEl = document.createElement('div');
-    this.classListEl.style.display = 'flex';
-    this.classListEl.style.flexWrap = 'wrap';
-    this.classListEl.style.gap = '4px';
-    this.classListEl.style.minHeight = '24px';
-    this.classListEl.style.border = '1px dashed #aaa';
-    this.classListEl.style.padding = '4px';
-    this.classListEl.style.marginBottom = '4px';
-    panel.appendChild(this.classListEl);
-
-    const classInputWrap = document.createElement('div');
-    const classInput = document.createElement('input');
-    classInput.type = 'text';
-    classInput.placeholder = 'Новый класс';
-    classInput.style.width = '140px';
-    const addClassBtn = document.createElement('button');
-    addClassBtn.textContent = '+';
-    addClassBtn.title = 'Добавить класс';
-    addClassBtn.addEventListener('click', () => {
-      // Добавляем класс ко всем ведущим ячейкам диапазона (если есть диапазон) либо к одной выбранной.
-      const name = classInput.value.trim();
-      if (!name) return; // пустые игнорируем
-      let changed = false;
-      // Оборачиваем серию событий в batch чтобы избежать каскада render() (через scheduler) на каждую ячейку.
+    // Функция применения нового списка классов (нормализация + batch)
+    this._applyClasses = (newList) => {
       this.bus.batch(() => {
         this._forEachLeadCellInRange((cell, r, c) => {
-          const current = cell.classes ? [...cell.classes] : [];
-          const validation = this.validator.canAddClass(current, name);
-          if (!validation.ok) return;
-          current.push(name);
-          this.model.setCellClasses(r, c, current);
-          changed = true;
+          const normalized = this.validator.normalizeClassList(newList);
+          const oldNorm = this.validator.normalizeClassList(cell.classes || []);
+          if (JSON.stringify(normalized) !== JSON.stringify(oldNorm)) {
+            this.model.setCellClasses(r, c, normalized);
+          }
         });
       });
-      if (changed) {
-        this.refresh();
-        classInput.value = '';
-      }
-    });
-    classInputWrap.appendChild(classInput);
-    classInputWrap.appendChild(addClassBtn);
-    classInputWrap.style.display = 'flex';
-    classInputWrap.style.gap = '4px';
-    classInputWrap.style.marginBottom = '8px';
-    panel.appendChild(classInputWrap);
-
-    this._renderClassChips = (cell) => {
-      this.classListEl.innerHTML = '';
-      const list = cell && cell.classes ? cell.classes : [];
-      if (!list.length) {
-        const empty = document.createElement('span');
-        empty.textContent = '(нет)';
-        empty.style.opacity = '0.6';
-        this.classListEl.appendChild(empty);
-        return;
-      }
-      for (const cls of list) {
-        const chip = document.createElement('span');
-        chip.textContent = cls + ' ×';
-        chip.style.background = '#eee';
-        chip.style.border = '1px solid #bbb';
-        chip.style.padding = '2px 6px';
-        chip.style.cursor = 'pointer';
-        chip.addEventListener('click', () => {
-          let removedAny = false;
-          this.bus.batch(() => {
-            this._forEachLeadCellInRange((cell, r, c) => {
-              const current = cell.classes ? [...cell.classes] : [];
-              if (!current.includes(cls)) return;
-              const filtered = current.filter(x => x !== cls);
-              this.model.setCellClasses(r, c, filtered);
-              removedAny = true;
-            });
-          });
-          if (removedAny) this.refresh();
-        });
-        this.classListEl.appendChild(chip);
-      }
+      this.refresh();
     };
 
-    // ----- БЛОК data-* -----
-    const dataTitle = document.createElement('div');
-    dataTitle.textContent = 'data-* атрибуты:';
-    dataTitle.style.marginTop = '4px';
-    panel.appendChild(dataTitle);
-
-    this.dataTable = document.createElement('table');
-    this.dataTable.style.width = '100%';
-    this.dataTable.style.borderCollapse = 'collapse';
-    this.dataTable.style.marginTop = '4px';
-    this.dataTbody = document.createElement('tbody');
-    this.dataTable.appendChild(this.dataTbody);
-    panel.appendChild(this.dataTable);
-
-    // ---- Добавление / обновление data-* пары (единый ключ без авто-генерации) ----
-    // Для джуниора: теперь мы не создаём автоматически key1, key2. Вместо этого просим пользователя ввести
-    // понятные key и value. Если в ячейке уже есть этот ключ — просто обновим его значение.
-    const dataAddWrap = document.createElement('div');
-    dataAddWrap.style.display = 'flex';
-    dataAddWrap.style.gap = '4px';
-    dataAddWrap.style.marginTop = '4px';
-    const dataKeyInput = document.createElement('input');
-    dataKeyInput.type = 'text';
-    dataKeyInput.placeholder = 'key';
-    dataKeyInput.style.width = '110px';
-    const dataValInput = document.createElement('input');
-    dataValInput.type = 'text';
-    dataValInput.placeholder = 'value';
-    dataValInput.style.width = '140px';
-    const applyDataBtn = document.createElement('button');
-    applyDataBtn.textContent = 'Применить';
-    applyDataBtn.title = 'Добавить или обновить data-* во всех выбранных ячейках';
-    applyDataBtn.addEventListener('click', () => {
-      const key = dataKeyInput.value.trim();
-      if (!key) { console.warn('Ключ не может быть пустым'); return; }
-      if (!this.validator.validateDataKey(key)) { console.warn('Недопустимый формат ключа'); return; }
-      const value = dataValInput.value; // пустая строка допустима
-      let changed = false;
+    // Применение значения атрибута (либо его удаления)
+    this._applyAttribute = (attrName, enabled, valueMeta) => {
       this.bus.batch(() => {
         this._forEachLeadCellInRange((cell, r, c) => {
           const current = cell.data ? { ...cell.data } : {};
-          if (!(key in current)) {
-            const validation = this.validator.canAddDataAttribute(current, key, value);
-            if (!validation.ok) return;
-          }
-            if (current[key] !== value) {
-              current[key] = value;
+          if (!enabled) {
+            if (attrName in current) {
+              delete current[attrName];
               this.model.setCellData(r, c, current);
-              changed = true;
             }
-        });
-      });
-      if (changed) {
-        // Не очищаем выделение — SidePanel.refresh() перерисует список, а диапазон восстановится через reapplyRange (будет добавлен).
-        this.refresh();
-      }
-    });
-    dataAddWrap.appendChild(dataKeyInput);
-    dataAddWrap.appendChild(dataValInput);
-  dataAddWrap.appendChild(applyDataBtn);
-  // Для UX можно в будущем добавить Enter по полю value => клик по кнопке.
-    panel.appendChild(dataAddWrap);
-
-    this._renderDataRows = (cell) => {
-      this.dataTbody.innerHTML = '';
-      const obj = cell && cell.data ? cell.data : {};
-      const keys = Object.keys(obj);
-      if (!keys.length) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 3; td.textContent = '(нет атрибутов)'; td.style.opacity = '0.6';
-        tr.appendChild(td); this.dataTbody.appendChild(tr); return;
-      }
-      for (const k of keys) {
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #ddd';
-        const keyTd = document.createElement('td');
-        const valTd = document.createElement('td');
-        const delTd = document.createElement('td');
-        keyTd.style.padding = valTd.style.padding = delTd.style.padding = '2px';
-        const keyInput = document.createElement('input'); keyInput.type = 'text'; keyInput.value = k; keyInput.style.width = '110px';
-        const valInput = document.createElement('input'); valInput.type = 'text'; valInput.value = obj[k]; valInput.style.width = '140px';
-        const delBtn = document.createElement('button'); delBtn.textContent = '×'; delBtn.title = 'Удалить атрибут';
-        delBtn.addEventListener('click', () => {
-          let removed = false;
-          this.bus.batch(() => {
-            this._forEachLeadCellInRange((cell, r, c) => {
-              const copy = cell.data ? { ...cell.data } : {};
-              if (!(k in copy)) return;
-              delete copy[k];
-              this.model.setCellData(r, c, copy);
-              removed = true;
-            });
-          });
-          if (removed) this.refresh();
-        });
-        keyInput.addEventListener('change', () => {
-          // Переименовываем ключ во всех ячейках, где он есть и где нет конфликта по новому имени.
-          const newKey = keyInput.value.trim();
-          if (!newKey) { console.warn('Ключ не может быть пустым'); keyInput.value = k; return; }
-          if (!this.validator.validateDataKey(newKey)) {
-            console.warn('Недопустимый формат ключа data-атрибута');
-            keyInput.value = k; return; }
-          if (newKey === k) return; // не изменили
-          let renamed = false;
-          this.bus.batch(() => {
-            this._forEachLeadCellInRange((cell, r, c) => {
-              if (!cell.data) return;
-              if (!(k in cell.data)) return;
-              if (newKey in cell.data) return;
-              const copy = { ...cell.data };
-              copy[newKey] = copy[k]; delete copy[k];
-              this.model.setCellData(r, c, copy);
-              renamed = true;
-            });
-          });
-          if (!renamed) {
-            // Если не смогли ни в одной ячейке — откатываем поле ввода.
-            keyInput.value = k;
             return;
           }
-          this.refresh();
+          // enabled = true
+          let valToStore = current[attrName];
+            if (valToStore === undefined) {
+              // Заполняем дефолтом или авто-значением
+              if (valueMeta.type === 'enum') valToStore = valueMeta.default ?? valueMeta.values[0];
+              else if (valueMeta.type === 'number') valToStore = valueMeta.default ?? (valueMeta.min != null ? valueMeta.min : 0);
+              else if (valueMeta.type === 'boolean') valToStore = valueMeta.default ?? false;
+            }
+          // Если нам передали конкретное новое значение (valueMeta._newValue) используем его
+          if (valueMeta && Object.prototype.hasOwnProperty.call(valueMeta, '_newValue')) {
+            valToStore = valueMeta._newValue;
+          }
+          // Валидация перед записью
+          const valid = this.validator.validateAttribute(attrName, valToStore);
+          if (!valid.ok) return; // не записываем невалидное
+          if (current[attrName] !== valToStore) {
+            current[attrName] = valToStore;
+            this.model.setCellData(r, c, current);
+          }
         });
-        valInput.addEventListener('change', () => {
-          // Изменяем значение data-* ключа у всех ячеек диапазона, в которых этот ключ существует.
-          const newVal = valInput.value;
-          this.bus.batch(() => {
-            this._forEachLeadCellInRange((cell, r, c) => {
-              if (!cell.data || !(k in cell.data)) return;
-              const copy = { ...cell.data };
-              copy[k] = newVal;
-              this.model.setCellData(r, c, copy);
-            });
-          });
-        });
-        keyTd.appendChild(keyInput); valTd.appendChild(valInput); delTd.appendChild(delBtn);
-        tr.appendChild(keyTd); tr.appendChild(valTd); tr.appendChild(delTd); this.dataTbody.appendChild(tr);
+      });
+      this.refresh();
+    };
+
+    // Построение UI контролов классов
+    this._buildClassControls = (cell) => {
+      this.classControlsEl.innerHTML = '';
+      const allowed = this.validator.listAllowedClasses();
+      if (!allowed.length) {
+  const empty = document.createElement('div'); empty.textContent = '(нет определённых классов)'; empty.className = 'tg-sp-empty';
+        this.classControlsEl.appendChild(empty); return;
       }
+      // Группируем по group
+      const byGroup = new Map();
+      for (const cls of allowed) {
+        const grp = cls.group || '(misc)';
+        if (!byGroup.has(grp)) byGroup.set(grp, []);
+        byGroup.get(grp).push(cls);
+      }
+      const current = cell && Array.isArray(cell.classes) ? cell.classes : [];
+      const normalizedCurrent = this.validator.normalizeClassList(current);
+      for (const [grp, list] of byGroup.entries()) {
+  const grpBox = document.createElement('div');
+  grpBox.className = 'tg-sp-class-group';
+  const grpTitle = document.createElement('div'); grpTitle.textContent = 'Группа: ' + grp; grpTitle.className = 'tg-sp-class-group-title';
+        grpBox.appendChild(grpTitle);
+        list.forEach(clsMeta => {
+          const label = document.createElement('label'); label.className = 'tg-sp-class-item';
+          const cb = document.createElement('input'); cb.type = 'checkbox';
+          cb.checked = normalizedCurrent.includes(clsMeta.name);
+          cb.addEventListener('change', () => {
+            // Формируем новый список: если включили — добавим; если выключили — удалим.
+            let newList = [...normalizedCurrent];
+            const idx = newList.indexOf(clsMeta.name);
+            if (cb.checked) {
+              if (idx === -1) newList.push(clsMeta.name);
+            } else {
+              if (idx !== -1) newList.splice(idx, 1);
+            }
+            // Нормализация эксклюзивных групп произойдёт в _applyClasses
+            this._applyClasses(newList);
+          });
+          const span = document.createElement('span'); span.textContent = clsMeta.name;
+          label.appendChild(cb); label.appendChild(span); grpBox.appendChild(label);
+        });
+        this.classControlsEl.appendChild(grpBox);
+      }
+    };
+
+    // Построение UI контролов атрибутов
+    this._buildAttrControls = (cell) => {
+      this.attrControlsEl.innerHTML = '';
+      const allowed = this.validator.listAllowedAttributes();
+      if (!allowed.length) {
+  const empty = document.createElement('div'); empty.textContent = '(нет определённых data-* атрибутов)'; empty.className = 'tg-sp-empty';
+        this.attrControlsEl.appendChild(empty); return;
+      }
+      const cellData = (cell && cell.data) ? cell.data : {};
+      allowed.forEach(meta => {
+  const row = document.createElement('div'); row.className = 'tg-sp-attr-row';
+        const enable = document.createElement('input'); enable.type = 'checkbox'; enable.title = 'Включить/отключить атрибут';
+        const isEnabled = meta.name in cellData;
+        enable.checked = isEnabled;
+  const label = document.createElement('span'); label.textContent = meta.name; label.className = 'tg-sp-attr-label';
+        // Контейнер редактора значения
+  const editorWrap = document.createElement('div'); editorWrap.className = 'tg-sp-attr-editor';
+
+        const buildValueEditor = () => {
+          editorWrap.innerHTML = '';
+          if (!enable.checked) return; // атрибут выключен — не рендерим редактор
+          let value = cellData[meta.name];
+          if (value === undefined) {
+            if (meta.type === 'enum') value = meta.default ?? meta.values[0];
+            else if (meta.type === 'number') value = meta.default ?? (meta.min != null ? meta.min : 0);
+            else if (meta.type === 'boolean') value = meta.default ?? false;
+          }
+          if (meta.type === 'enum') {
+            const sel = document.createElement('select');
+            meta.values.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+            sel.value = value;
+            sel.addEventListener('change', () => {
+              this._applyAttribute(meta.name, true, { ...meta, _newValue: sel.value });
+            });
+            editorWrap.appendChild(sel);
+          } else if (meta.type === 'number') {
+            const inp = document.createElement('input'); inp.type = 'number';
+            if (meta.min != null) inp.min = String(meta.min);
+            if (meta.max != null) inp.max = String(meta.max);
+            inp.value = String(value);
+            inp.style.width = '80px';
+            inp.addEventListener('change', () => {
+              let num = Number(inp.value);
+              if (Number.isNaN(num)) num = meta.min != null ? meta.min : 0;
+              if (meta.min != null && num < meta.min) num = meta.min;
+              if (meta.max != null && num > meta.max) num = meta.max;
+              this._applyAttribute(meta.name, true, { ...meta, _newValue: num });
+            });
+            editorWrap.appendChild(inp);
+          } else if (meta.type === 'boolean') {
+            const sel = document.createElement('select');
+            ['false','true'].forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+            sel.value = value ? 'true' : 'false';
+            sel.addEventListener('change', () => {
+              this._applyAttribute(meta.name, true, { ...meta, _newValue: sel.value === 'true' });
+            });
+            editorWrap.appendChild(sel);
+          }
+        };
+
+        enable.addEventListener('change', () => {
+          if (!enable.checked) {
+            this._applyAttribute(meta.name, false, meta);
+          } else {
+            buildValueEditor();
+            // Первичное включение — применяем дефолт
+            this._applyAttribute(meta.name, true, meta);
+          }
+        });
+        buildValueEditor();
+        row.appendChild(enable); row.appendChild(label); row.appendChild(editorWrap);
+        this.attrControlsEl.appendChild(row);
+      });
     };
   }
 
@@ -360,13 +316,20 @@ export class SidePanel {
         this.refresh();
         return;
       }
-      // Если скрытая merge часть (cell null) — игнорируем
-      if (!cell) {
+      // Если это накрытая merge часть (нет cell И координата покрыта merge) — игнорируем выбор
+      const covered = !cell && this.tableRenderer.isCoveredByMerge(r, c);
+      if (covered) {
         this.selectedCellRef = null;
         this.refresh();
         return;
       }
+      // Пустая (ещё не созданная) ячейка допустима: показываем её как выбранную
       this.selectedCellRef = { r, c };
+      this.refresh();
+    });
+    // Подписка на изменение диапазона (фиксация range) — для обновления отображения координат
+    this.bus.on('selection:range', () => {
+      // Диапазон зафиксирован (commitRange). Просто обновляем панель.
       this.refresh();
     });
   }
@@ -376,14 +339,27 @@ export class SidePanel {
    */
   refresh() {
     if (!this.selectedCellRef) {
-      this.selectedInfoEl.textContent = 'Ячейка не выбрана';
-      this._renderClassChips(null);
-      this._renderDataRows(null);
+      this.selectedInfoEl.textContent = 'нет';
+      this.classControlsEl.innerHTML = '<div class="tg-sp-empty">(нет выбора)</div>';
+      this.attrControlsEl.innerHTML = '<div class="tg-sp-empty">(нет выбора)</div>';
       return;
     }
+    // Проверяем диапазон: если есть и больше одной ячейки — показываем границы
+    const range = this.selectionService.getRange && this.selectionService.getRange();
+    if (range) {
+      const { r1, c1, r2, c2 } = range;
+      const multi = (r1 !== r2) || (c1 !== c2);
+      if (multi) {
+        // Переключаем в пользовательский (1-based) формат
+        this.selectedInfoEl.textContent = '(' + (r1+1) + ',' + (c1+1) + ') - (' + (r2+1) + ',' + (c2+1) + ')';
+      } else {
+        this.selectedInfoEl.textContent = '(' + (r1+1) + ',' + (c1+1) + ')';
+      }
+    } else {
+      this.selectedInfoEl.textContent = '(' + (this.selectedCellRef.r+1) + ',' + (this.selectedCellRef.c+1) + ')';
+    }
     const cell = this.model.getCell(this.selectedCellRef.r, this.selectedCellRef.c);
-    this.selectedInfoEl.textContent = 'Выбрана ячейка: (' + this.selectedCellRef.r + ',' + this.selectedCellRef.c + ')';
-    this._renderClassChips(cell);
-    this._renderDataRows(cell);
+    this._buildClassControls(cell);
+    this._buildAttrControls(cell);
   }
 }

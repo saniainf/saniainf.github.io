@@ -29,8 +29,15 @@ export class HistoryDebounceRecorder {
     // а не по таймеру.
     if (this._bus && typeof this._bus.on === 'function') {
       this._bus.on('batch:flush', () => {
-        // Если во время batch были события — flush их.
-        this.flush();
+        // Если были запланированы изменения (pending) — flush сделает snapshot.
+        // Если pending нет (например структура менялась внутри batch без вызова schedule()),
+        // всё равно делаем попытку record, чтобы зафиксировать одну точку отката.
+        if (this._pending) {
+          this.flush();
+        } else {
+          // Прямая запись. HistoryService сам отбросит дубликат если модель не изменилась.
+          this.history.record(this.model);
+        }
       });
     }
   }

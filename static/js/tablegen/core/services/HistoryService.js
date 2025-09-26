@@ -18,6 +18,14 @@ export class HistoryService {
   record(model) {
     if (this._suspend) return; // Не записываем когда выполняем восстановление
     const doc = model.toJSON();
+    // Предотвращаем запись дубликата: если последний снимок идентичен (побайтово после JSON.stringify)
+    // то пропускаем. Это решает проблему двойного Undo после операций, которые сами вызывают
+    // history.record и одновременно генерируют события structure:change, приводящие к отложенной
+    // записи через HistoryDebounceRecorder.
+    const last = this.stack[this.index];
+    if (last && JSON.stringify(last) === JSON.stringify(doc)) {
+      return; // дубликат — не добавляем второй раз
+    }
     // Если мы откатились назад и сделали новое действие — усекаем "будущее"
     if (this.index < this.stack.length - 1) {
       this.stack = this.stack.slice(0, this.index + 1);

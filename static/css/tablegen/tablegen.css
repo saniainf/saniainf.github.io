@@ -60,6 +60,19 @@ h1.tablegen-title {
   min-width: 40px;
 }
 
+/* Инпуты размеров столбцов */
+.tablegen-basic-table .tablegen-colsize-input {
+  width: 100%;
+  border: 1px solid #bbb;
+  background: #fff;
+  text-align: center;
+}
+.tablegen-basic-table .tablegen-colsize-input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 1px #1976d2;
+}
+
 /* Пользовательские строки шапки (дублируемые в thead) */
 /* Пользовательские строки шапки (headerRows). Теперь их содержимые ячейки редактируемы (td с data-r/data-c).
    Этот стиль применяется к левой нумерационной ячейке шапки. Делает фон чуть серым и шрифт жирным для визуального отделения. */
@@ -81,13 +94,15 @@ h1.tablegen-title {
 /* Выделенная ячейка (одиночный клик) */
 /* Выделенная ячейка (одиночный выбор). Раньше использовался outline, теперь оставляем только мягкий фон.
    Фон единый для шапки и тела таблицы. */
-.tablegen-basic-table td.tablegen-selected-cell {
-  background: #eef6ff;
+/* Унифицированный фон выделения (одна ячейка и диапазон) */
+.tablegen-basic-table td.tablegen-selected-cell,
+.tablegen-basic-table td.tablegen-range-cell {
+  background: #d5e9ff; /* Единый спокойный голубой */
 }
-/* В шапке фон был плохо заметен из-за базового серого. Делаем чуть насыщеннее и добавляем внутреннюю тень. */
-.tablegen-basic-table thead td.tablegen-selected-cell {
-  /* Чуть более насыщенный голубой чем в теле (теле #eef6ff) */
-  background: #d9eaff;
+/* В шапке оставляем тот же цвет, чтобы не отличалось визуально */
+.tablegen-basic-table thead td.tablegen-selected-cell,
+.tablegen-basic-table thead td.tablegen-range-cell {
+  background: #d5e9ff;
 }
 
 button.tablegen-btn {
@@ -100,13 +115,76 @@ button.tablegen-btn {
   margin-top: 8px;
 }
 
-/* Диапазонное выделение: убрали рамки, делаем более заметный единый фон.
-   Один стиль и для thead, и для tbody, чтобы поведение было предсказуемым. */
-.tablegen-basic-table td.tablegen-range-cell {
-  background: rgba(25,118,210,0.28);
+/* Диапазонное выделение: рамки классов tablegen-range-border-* удалены из JS и CSS.
+  Оставляем только заливку. Один стиль и для thead, и для tbody. */
+/* (Диапазон использует тот же фон что и одиночное выделение — отдельные правила не нужны) */
+
+/* Горизонтальная панель SidePanel (desktop only, без мобильного режима) */
+.tablegen-sidepanel-horizontal {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid #ccc;
+  padding: 8px 10px;
+  margin: 4px 0 12px 0;
+  background: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
 }
-/* Для шапки усиливаем ещё немного насыщенность чтобы не терялось на #f5f5f5 */
-.tablegen-basic-table thead td.tablegen-range-cell {
-  /* Чуть темнее чем в теле, без рамок */
-  background: rgba(25,118,210,0.34);
+.tablegen-sidepanel-horizontal .tg-sp-classes-box,
+.tablegen-sidepanel-horizontal .tg-sp-attrs-box {
+  max-height: 260px;
+  overflow: auto;
 }
+
+/* Общие базовые стили SidePanel */
+.tg-sp-title { font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+.tg-sp-selected-info { margin-bottom: 6px; font-size: 12px; opacity: .85; }
+.tg-sp-section-title { margin-top: 4px; font-weight: 500; font-size: 13px; }
+.tg-sp-section { display: flex; flex-direction: column; gap: 4px; }
+
+/* Блок метаданных */
+.tg-sp-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.tg-sp-selected-label { font-size: 12px; opacity: .75; }
+.tg-sp-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.tg-sp-field-inline { flex-direction: row; align-items: center; gap: 6px; }
+.tg-sp-input { padding: 2px 4px; font-size: 12px; }
+.tg-sp-input-text { width: 160px; }
+.tg-sp-input-number { width: 80px; }
+
+/* Пустые состояния */
+.tg-sp-empty { opacity: .6; font-size: 12px; }
+
+/* Классы (группы) */
+.tg-sp-classes-box { display: flex; flex-direction: row; gap: 8px; border: 1px dashed #aaa; padding: 6px; min-width: 220px; overflow-x: auto; overflow-y: hidden; }
+.tg-sp-class-group { border: 1px solid #ddd; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; min-width: 140px; background:#fff; }
+.tg-sp-class-group-title { font-size: 11px; opacity: .7; }
+.tg-sp-class-item { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
+.tg-sp-class-item:hover { background: #f0f0f0; }
+
+/* Атрибуты */
+.tg-sp-attrs-box { display: flex; flex-direction: column; gap: 6px; border: 1px dashed #aaa; padding: 6px; min-width: 260px; }
+.tg-sp-attr-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.tg-sp-attr-label { min-width: 90px; font-size: 12px; }
+.tg-sp-attr-editor { display: flex; align-items: center; gap: 4px; }
+.tg-sp-attr-editor input[type="text"],
+.tg-sp-attr-editor input[type="number"],
+.tg-sp-attr-editor select { font-size: 12px; padding: 2px 4px; }
+.tg-sp-attr-editor input[type="number"] { width: 90px; }
+.tg-sp-attr-editor input[type="text"] { width: 120px; }
+
+/* Стили чекбоксов и переключателей */
+.tg-sp-attr-row input[type="checkbox"] { cursor: pointer; }
+
+/* Скроллбар (не обязательно, но для аккуратности) */
+.tablegen-sidepanel-horizontal .tg-sp-classes-box::-webkit-scrollbar,
+.tablegen-sidepanel-horizontal .tg-sp-attrs-box::-webkit-scrollbar { width: 8px; }
+.tablegen-sidepanel-horizontal .tg-sp-classes-box::-webkit-scrollbar-track,
+.tablegen-sidepanel-horizontal .tg-sp-attrs-box::-webkit-scrollbar-track { background: #f1f1f1; }
+.tablegen-sidepanel-horizontal .tg-sp-classes-box::-webkit-scrollbar-thumb,
+.tablegen-sidepanel-horizontal .tg-sp-attrs-box::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+.tablegen-sidepanel-horizontal .tg-sp-classes-box::-webkit-scrollbar-thumb:hover,
+.tablegen-sidepanel-horizontal .tg-sp-attrs-box::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+/* Конец блока стилей SidePanel */

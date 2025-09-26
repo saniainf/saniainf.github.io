@@ -24,6 +24,12 @@ import { SelectionService } from './SelectionService.js';
 import { ValidationService } from '../core/services/ValidationService.js';
 import { RenderScheduler } from './RenderScheduler.js';
 import { setupHotkeys } from './init/setupHotkeys.js';
+import { setupRowColSelection } from './init/setupRowColSelection.js';
+// Реестр предопределённых классов и data-* атрибутов (core + project)
+// Переходим к динамической модели: проектный реестр (project registry) передаётся извне (HTML) или через options.
+// Здесь импортируем только CORE_REGISTRY. Слияние выполняем локально.
+import { CORE_REGISTRY } from '../config/registry.core.js';
+import { mergeCoreAndProject } from '../config/registry.index.js';
 
 /**
  * Инициализирует редактор таблиц TableGen внутри DOM элемента по его id.
@@ -45,7 +51,14 @@ import { setupHotkeys } from './init/setupHotkeys.js';
  *   testButtons: any
  * }} Объект с ключевыми сервисами (упрощает доступ из внешнего кода / консоли)
  */
-export function initTableGen(rootElementId) {
+/**
+ * Инициализация TableGen.
+ * Теперь поддерживает опциональный внешне переданный projectRegistry, чтобы базовый код оставался общим,
+ * а кастомные классы/атрибуты подмешивались из разных HTML файлов.
+ * @param {string} rootElementId id контейнера
+ * @param {{projectRegistry?: Object, registry?: Object}} [options] Доп.параметры
+ */
+export function initTableGen(rootElementId, options = {}) {
   // 1. Шина событий: централизованная подписка/emit для всех сервисов
   const bus = new EventBus();
 
@@ -60,6 +73,20 @@ export function initTableGen(rootElementId) {
   // 3. Модель (данные таблицы) + сервис валидации структуры / операций
   const model = new TableModel(initialDoc, bus);
   const validator = new ValidationService(model);
+  // --- Реестр ---
+  // Приоритеты получения проектного реестра:
+  // 1. options.registry (если передали уже готовый final registry)
+  // 2. options.projectRegistry (только проектная часть поверх core)
+  // 3. window.TABLEGEN_PROJECT_REGISTRY (глобал, определённый в HTML)
+  // 4. Пустой (только core)
+  let finalRegistry;
+  if (options.registry) {
+    finalRegistry = options.registry;
+  } else {
+    const project = options.projectRegistry || (typeof window !== 'undefined' && window.TABLEGEN_PROJECT_REGISTRY) || null;
+    finalRegistry = mergeCoreAndProject(CORE_REGISTRY, project);
+  }
+  validator.initRegistry(finalRegistry);
   const history = new HistoryService(50);
   // Первая запись истории: фиксируем стартовое состояние
   history.record(model);
@@ -73,6 +100,7 @@ export function initTableGen(rootElementId) {
   if (!root) { console.error('[initTableGen] Не найден root элемент', rootElementId); return { model, bus }; }
   const renderer = new TableRenderer(model, bus);
   root.appendChild(renderer.tableEl);
+
 
   // 5. RenderScheduler: гарантирует 1 перерисовку за кадр + восстановление выделения после render
   const selectionService = new SelectionService(model, renderer, bus);
@@ -88,13 +116,8 @@ export function initTableGen(rootElementId) {
   // Создаётся до контроллера диапазона, так как drag логика должна знать об активном редакторе.
   const inlineEditor = new InlineEditor(model, renderer, history, selectionService, scheduler, bus);
 
-  // 7. Обработчик вставки из буфера: перехватывает системный paste и делегирует парсинг сервису
-  document.addEventListener('paste', (e) => {
-    const meta = handleClipboardPaste(e, model);
-    if (meta) {
-      // meta может использоваться в будущем для расширений (например авто-выделение вставленного диапазона)
-    }
-  });
+  // 7. Глобальная вставка Ctrl+V отключена (по требованиям текущей версии). Вставка значений выполняется
+  // только через внутренний буфер Ctrl+C / Ctrl+V (см. setupHotkeys расширенный функционал copy/paste значений).
 
   // 8. UI модуль Импорт / Экспорт JSON
   const importExport = setupImportExportUI({ model, history, validator, bus });
@@ -103,23 +126,29 @@ export function initTableGen(rootElementId) {
   // 9. Контроллер drag-выделения диапазона (мышью) — учитывает активный inline редактор
   const dragController = setupDragRangeController({ renderer, selectionService, inlineEditor });
 
-  // 10. Панель действий (merge / split): предоставляет кнопки объединения и разделения ячеек,
-  // проверяет валидность текущего диапазона через ValidationService перед выполнением операции
-  const actionsBar = setupActionBar({ model, selectionService, validator });
-  root.appendChild(actionsBar.element);
+  // 10. SidePanel: теперь создаём раньше ActionBar, чтобы ActionBar шёл строго под ней
+  const sidePanel = new SidePanel(model, renderer, selectionService, bus, validator, { horizontal: true });
+  if (root.firstChild) {
+    root.insertBefore(sidePanel.rootEl, root.firstChild);
+  } else {
+    root.appendChild(sidePanel.rootEl);
+  }
 
-  // 11. SidePanel: редактирование CSS классов и data-* атрибутов текущей ячейки или диапазона
-  const sidePanel = new SidePanel(model, renderer, selectionService, bus, validator);
-  root.appendChild(sidePanel.rootEl);
+  // 11. Панель действий (merge / split / вставки) перемещена ПОД SidePanel
+  const actionsBar = setupActionBar({ model, selectionService, validator, bus });
+  root.insertBefore(actionsBar.element, renderer.tableEl);
 
   // 12. Горячие клавиши (Undo/Redo) — поддержка разных раскладок клавиатуры
-  const hotkeys = setupHotkeys({ history, model, inlineEditor, scheduler, bus });
+  const hotkeys = setupHotkeys({ history, model, inlineEditor, scheduler, bus, selectionService });
 
-  // 13. Первый синхронный рендер: показываем таблицу без задержки animation frame
+  // 13. Выбор целой строки/столбца по клику на заголовок
+  const rowColSelection = setupRowColSelection({ selectionService, renderer });
+
+  // 14. Первый синхронный рендер: показываем таблицу без задержки animation frame
   scheduler.flush();
 
-  // 14. Тестовые кнопки (dev only) — легко отключить при сборке в продакшн
+  // 15. Тестовые кнопки (dev only) — легко отключить при сборке в продакшн
   const testButtons = setupTestButtons(document.body);
 
-  return { model, bus, render: () => scheduler.flush(), history, inlineEditor, sidePanel, selectionService, validator, scheduler, hotkeys, testButtons };
+  return { model, bus, render: () => scheduler.flush(), history, inlineEditor, sidePanel, selectionService, validator, scheduler, hotkeys, rowColSelection, testButtons, registry: finalRegistry };
 }

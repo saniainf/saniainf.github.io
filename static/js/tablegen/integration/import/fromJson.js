@@ -5,11 +5,16 @@
 // позже можно расширить (вынести в ValidationService).
 
 /**
- * Попытаться разобрать JSON строку в TableDocument
- * @param {string} jsonString - входная JSON строка
+ * Попытаться разобрать JSON строку в TableDocument.
+ * Дополнено STRICT проверкой против реестра (если validator передан).
+ * Для джуниора: базовый парсинг + поверхностные проверки структуры, затем (опционально)
+ * углублённая проверка классов и data-* значений в соответствии с реестром ValidationService.
+ * Мы не тянем сам сервис внутрь (чтобы избежать циклических зависимостей), а принимаем его опционально.
+ * @param {string} jsonString входная JSON строка
+ * @param {import('../../core/services/ValidationService.js').ValidationService} [validator] опциональный валидатор для STRICT проверки
  * @returns {{ok:true, doc:object}|{ok:false, error:string}}
  */
-export function parseTableJson(jsonString) {
+export function parseTableJson(jsonString, validator) {
   if (typeof jsonString !== 'string') {
     return { ok: false, error: 'Ожидалась строка JSON' };
   }
@@ -26,7 +31,8 @@ export function parseTableJson(jsonString) {
     return { ok: false, error: 'Отсутствует корректный grid' };
   }
   if (!Array.isArray(raw.cells)) raw.cells = [];
-  // Ленивая нормализация полей ячеек
+  // Ленивая нормализация полей ячеек + локальное накопление ошибок STRICT (если есть validator)
+  const strictErrors = [];
   for (const cell of raw.cells) {
     if (typeof cell.r !== 'number' || typeof cell.c !== 'number') {
       return { ok: false, error: 'Ячейка без координат (r,c)' };
@@ -40,6 +46,45 @@ export function parseTableJson(jsonString) {
     if (cell.data && typeof cell.data !== 'object') {
       return { ok: false, error: 'Поле data должно быть объектом' };
     }
+    // STRICT: проверяем каждый класс и data-* сразу, чтобы раннее выявить ошибку импорта
+    if (validator && validator._registry) {
+      // Классы
+      if (Array.isArray(cell.classes)) {
+        for (const cls of cell.classes) {
+          if (!validator._classSet.has(cls)) {
+            strictErrors.push(`неизвестный класс: ${cls} (r=${cell.r},c=${cell.c})`);
+          }
+        }
+        // Проверка конфликтов exclusiveGroup (вариант B: в рантайме нормализуем, но при импорте — сообщаем)
+        const seenGroups = new Map();
+        for (const cls of cell.classes) {
+          const grp = validator._exclusiveGroups.get(cls);
+            if (!grp) continue;
+            if (seenGroups.has(grp)) {
+              strictErrors.push(`конфликт exclusiveGroup '${grp}' классы '${seenGroups.get(grp)}' и '${cls}' (r=${cell.r},c=${cell.c})`);
+            } else {
+              seenGroups.set(grp, cls);
+            }
+        }
+      }
+      // data-*
+      if (cell.data) {
+        for (const key of Object.keys(cell.data)) {
+          const meta = validator._attrMap.get(key);
+          if (!meta) {
+            strictErrors.push(`неизвестный data-атрибут: ${key} (r=${cell.r},c=${cell.c})`);
+            continue;
+          }
+          const val = cell.data[key];
+          if (!validator._validateAttributeValue(meta, val)) {
+            strictErrors.push(`недопустимое значение '${val}' для ${key} (r=${cell.r},c=${cell.c})`);
+          }
+        }
+      }
+    }
+  }
+  if (strictErrors.length) {
+    return { ok: false, error: 'STRICT ошибки импорта:\n' + strictErrors.join('\n') };
   }
   return { ok: true, doc: raw };
 }

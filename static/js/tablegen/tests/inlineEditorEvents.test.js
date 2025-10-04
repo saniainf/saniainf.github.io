@@ -1,7 +1,5 @@
 // inlineEditorEvents.test.js
-// Тесты событий InlineEditor (edit:start, edit:commit, edit:cancel)
-// Для джуниора: мы эмулируем работу редактора без полноценного DOM-фреймворка.
-// Проверяем, что при запуске, подтверждении и отмене редактирования генерируются корректные события.
+// Тесты событий InlineEditor (edit:start, edit:commit, edit:cancel) в облегчённой DOM-среде.
 
 import { EventBus } from '../core/events/EventBus.js';
 import { TableModel } from '../core/model/TableModel.js';

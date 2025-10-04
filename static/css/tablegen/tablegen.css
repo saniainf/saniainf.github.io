@@ -3,7 +3,7 @@
 
 body.tablegen-page {
   font-family: Arial, sans-serif;
-  margin: 16px;
+  margin: 8px;
 }
 
 h1.tablegen-title {
@@ -11,12 +11,13 @@ h1.tablegen-title {
   margin-top: 0;
 }
 
-#tablegen-root {
-  margin-top: 12px;
-}
+/* #tablegen-root {
+  
+} */
 
 .tablegen-basic-table {
   border-collapse: collapse;
+  margin-bottom: .5rem;
 }
 
 .tablegen-basic-table td {
@@ -120,19 +121,6 @@ button.tablegen-btn {
 /* (Диапазон использует тот же фон что и одиночное выделение — отдельные правила не нужны) */
 
 /* Горизонтальная панель SidePanel (desktop only, без мобильного режима) */
-.tablegen-sidepanel-horizontal {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 12px;
-  align-items: flex-start;
-  border: 1px solid #ccc;
-  padding: 8px 10px;
-  margin: 4px 0 12px 0;
-  background: #fafafa;
-  width: 100%;
-  box-sizing: border-box;
-}
 .tablegen-sidepanel-horizontal .tg-sp-classes-box,
 .tablegen-sidepanel-horizontal .tg-sp-attrs-box {
   max-height: 260px;
@@ -141,12 +129,12 @@ button.tablegen-btn {
 
 /* Общие базовые стили SidePanel */
 .tg-sp-title { font-weight: 600; margin-bottom: 6px; font-size: 14px; }
-.tg-sp-selected-info { margin-bottom: 6px; font-size: 12px; opacity: .85; }
-.tg-sp-section-title { margin-top: 4px; font-weight: 500; font-size: 13px; }
+.tg-sp-selected-info { font-size: 12px; opacity: .85; }
+.tg-sp-section-title { font-weight: 500; font-size: 13px; }
 .tg-sp-section { display: flex; flex-direction: column; gap: 4px; }
 
 /* Блок метаданных */
-.tg-sp-meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.tg-sp-meta { display: flex; flex-direction: column; gap: 8px; }
 .tg-sp-selected-label { font-size: 12px; opacity: .75; }
 .tg-sp-field { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
 .tg-sp-field-inline { flex-direction: row; align-items: center; gap: 6px; }
@@ -159,15 +147,35 @@ button.tablegen-btn {
 
 /* Классы (группы) */
 .tg-sp-classes-box { display: flex; flex-direction: row; gap: 8px; border: 1px dashed #aaa; padding: 6px; min-width: 220px; overflow-x: auto; overflow-y: hidden; }
-.tg-sp-class-group { border: 1px solid #ddd; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; min-width: 140px; background:#fff; }
+.tg-sp-class-group { border: 1px solid #ddd; padding: 4px 6px; display: flex; flex-direction: column; gap: 4px; min-width: 140px; background:#fff; box-sizing: border-box; }
+/* Внутренняя сетка элементов класса: максимум 3 строки, далее переход в новый столбец */
+.tg-sp-class-items { 
+  display: grid;
+  grid-auto-flow: column; /* Заполняем вниз до 3 строк, затем вправо новая колонка */
+  grid-template-rows: repeat(3, auto);
+  align-content: start;
+  gap: 4px 12px; /* Межстрочный и межколоночный отступ */
+}
 .tg-sp-class-group-title { font-size: 11px; opacity: .7; }
 .tg-sp-class-item { display: flex; align-items: center; gap: 4px; font-size: 12px; cursor: pointer; }
 .tg-sp-class-item:hover { background: #f0f0f0; }
 
 /* Атрибуты */
-.tg-sp-attrs-box { display: flex; flex-direction: column; gap: 6px; border: 1px dashed #aaa; padding: 6px; min-width: 260px; }
+.tg-sp-attrs-box { 
+  /* Аналогичная сетка: по 3 строки атрибутов в колонке. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  align-content: start;
+  gap: 6px 16px;
+  border: 1px dashed #aaa; 
+  padding: 6px; 
+  min-width: 260px; 
+  overflow-x: auto; 
+  overflow-y: hidden; 
+}
 .tg-sp-attr-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.tg-sp-attr-label { min-width: 90px; font-size: 12px; }
+.tg-sp-attr-label { font-size: 12px; cursor: pointer; user-select: none; }
 .tg-sp-attr-editor { display: flex; align-items: center; gap: 4px; }
 .tg-sp-attr-editor input[type="text"],
 .tg-sp-attr-editor input[type="number"],
@@ -188,3 +196,92 @@ button.tablegen-btn {
 .tablegen-sidepanel-horizontal .tg-sp-classes-box::-webkit-scrollbar-thumb:hover,
 .tablegen-sidepanel-horizontal .tg-sp-attrs-box::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 /* Конец блока стилей SidePanel */
+
+/* Панель быстрых атрибутов под Action Bar */
+.tablegen-quick-attrs {
+  box-sizing: border-box;
+  display: inline-flex; /* Делаем панель строчным flex-блоком, чтобы ширина подстраивалась под содержимое. */
+  max-width: 100%; /* Ограничиваем ширину контейнера, чтобы он не выходил за рамки родителя. */
+  min-height: 56px;
+  gap: 12px; /* Расставляем равномерные интервалы между блоками с атрибутами, чтобы разделитель не "прилипал" к кнопкам. */
+}
+
+/* Горизонтальный скролл только для области таблицы, без влияния на верхние панели */
+.tablegen-table-scroll {
+  width: 100%;
+  overflow-x: auto; /* Если таблица шире контейнера — появляется горизонтальный скролл */
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* Плавная прокрутка на тач-устройствах */
+}
+/* Убираем двойную нижнюю границу при горизонтальном скролле (опционально можно настроить тень) */
+.tablegen-table-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.tablegen-table-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+.tablegen-table-scroll::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+.tablegen-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+.tablegen-quick-attr {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative; /* Готовим контейнер для псевдоэлемента-разделителя, чтобы он позиционировался относительно блока. */
+  padding-left: 12px; /* Добавляем внутренний отступ слева, чтобы текст не прилипал к вертикальной линии. */
+}
+.tablegen-quick-attr::before {
+  content: ""; /* Отрисовываем декоративную вертикальную линию между соседними атрибутами. */
+  position: absolute;
+  left: 0;
+  top: 6px; /* Смещаем линию вниз, чтобы у верхнего текста оставалась воздушность. */
+  bottom: 6px; /* Делаем линию короче полной высоты, чтобы визуально лёгкий разделитель не упирался в края. */
+  width: 1px;
+  background: #e5e7eb; /* Нейтральный серый оттенок, согласующийся с другими линиями интерфейса. */
+}
+.tablegen-quick-attr:first-child {
+  padding-left: 0; /* Для первого атрибута убираем отступ, иначе панель сместится вправо. */
+}
+.tablegen-quick-attr:first-child::before {
+  display: none; /* Первый блок не имеет разделителя слева, чтобы панель начиналась чисто. */
+}
+.tablegen-quick-attr-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+.tablegen-quick-attr-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+.tablegen-quick-attr-off {
+  font-size: 11px;
+  color: #6b7280;
+}
+.tablegen-quick-attr-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tablegen-quick-attr-reset {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.tablegen-quick-attr-reset:hover {
+  color: #1f2937;
+}
+.tablegen-quick-attr-empty {
+  font-size: 12px;
+  color: #6b7280;
+}

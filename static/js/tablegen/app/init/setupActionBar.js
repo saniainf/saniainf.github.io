@@ -1,6 +1,5 @@
 // setupActionBar.js
-// Отвечает за создание панели действий (merge / split + вставка строк/столбцов).
-// Для джуниора: вынос в отдельный модуль снижает размер init.js и изолирует UI-команды.
+// Создание панели действий (merge / split / вставка / удаление строк и столбцов). Выносит UI-команды из init.js.
 
 import { mergeRange, splitCell, splitAllInRange } from '../../core/services/MergeService.js';
 
@@ -16,11 +15,15 @@ export function setupActionBar(ctx) {
   const { model, selectionService, validator, bus } = ctx; // добавляем bus для batch
   const actionsBar = document.createElement('div');
   actionsBar.className = 'tablegen-actions-bar';
-  actionsBar.style.marginTop = '8px';
+  // Добавляем tailwind классы для визуального блока: flex wrap gap и лёгкая подложка
+  actionsBar.classList.add('flex','flex-wrap','items-center','gap-2','p-2','bg-white','border','border-gray-200','rounded');
 
   // Кнопка объединения диапазона
   const mergeRangeBtn = document.createElement('button');
-  mergeRangeBtn.textContent = 'Объединить выделение';
+  mergeRangeBtn.textContent = 'Merge →|←';
+  // Применяем базовый tailwind стиль
+  // Делаем стиль единообразным для всех кнопок панели: используем только базовый tg-btn
+  mergeRangeBtn.classList.add('tg-btn');
   mergeRangeBtn.addEventListener('click', () => {
     const rect = selectionService.getRange();
     if (!rect) {
@@ -45,8 +48,8 @@ export function setupActionBar(ctx) {
 
   // Универсальная кнопка split
   const unifiedSplitBtn = document.createElement('button');
-  unifiedSplitBtn.textContent = 'Разъединить';
-  unifiedSplitBtn.style.marginLeft = '6px';
+  unifiedSplitBtn.textContent = 'Split ←|→';
+  unifiedSplitBtn.classList.add('tg-btn');
   unifiedSplitBtn.addEventListener('click', () => {
     const rect = selectionService.getRange();
     if (rect) {
@@ -105,7 +108,7 @@ export function setupActionBar(ctx) {
   // Кнопка: вставить строку ВВЕРХ (перед текущей/anchor.r)
   const addRowUpBtn = document.createElement('button');
   addRowUpBtn.textContent = '+Row ↑';
-  addRowUpBtn.style.marginLeft = '6px';
+  addRowUpBtn.classList.add('tg-btn');
   addRowUpBtn.addEventListener('click', () => {
     const anchor = getAnchor();
     bus.batch(() => {
@@ -118,7 +121,7 @@ export function setupActionBar(ctx) {
   // Кнопка: вставить строку ВНИЗ (после anchor.r) => index = anchor.r + 1
   const addRowDownBtn = document.createElement('button');
   addRowDownBtn.textContent = '+Row ↓';
-  addRowDownBtn.style.marginLeft = '4px';
+  addRowDownBtn.classList.add('tg-btn');
   addRowDownBtn.addEventListener('click', () => {
     const anchor = getAnchor();
     bus.batch(() => {
@@ -132,7 +135,7 @@ export function setupActionBar(ctx) {
   // Кнопка: вставить столбец СЛЕВА (перед anchor.c)
   const addColLeftBtn = document.createElement('button');
   addColLeftBtn.textContent = '+Col ←';
-  addColLeftBtn.style.marginLeft = '6px';
+  addColLeftBtn.classList.add('tg-btn');
   addColLeftBtn.addEventListener('click', () => {
     const anchor = getAnchor();
     bus.batch(() => {
@@ -145,7 +148,7 @@ export function setupActionBar(ctx) {
   // Кнопка: вставить столбец СПРАВА (после anchor.c)
   const addColRightBtn = document.createElement('button');
   addColRightBtn.textContent = '+Col →';
-  addColRightBtn.style.marginLeft = '4px';
+  addColRightBtn.classList.add('tg-btn');
   addColRightBtn.addEventListener('click', () => {
     const anchor = getAnchor();
     bus.batch(() => {
@@ -207,13 +210,13 @@ export function setupActionBar(ctx) {
   }
   const delRowBtn = document.createElement('button');
   delRowBtn.textContent = '-Row';
-  delRowBtn.style.marginLeft = '10px';
+  delRowBtn.classList.add('tg-btn');
   delRowBtn.addEventListener('click', deleteAnchorRow);
   actionsBar.appendChild(delRowBtn);
 
   const delColBtn = document.createElement('button');
   delColBtn.textContent = '-Col';
-  delColBtn.style.marginLeft = '4px';
+  delColBtn.classList.add('tg-btn');
   delColBtn.addEventListener('click', deleteAnchorColumn);
   actionsBar.appendChild(delColBtn);
 

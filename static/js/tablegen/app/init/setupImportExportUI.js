@@ -1,6 +1,5 @@
 // setupImportExportUI.js
-// Отвечает за UI импорта / экспорта JSON.
-// Для джуниора: вынос позволяет переиспользовать или отключать этот блок отдельно.
+// UI импорта / экспорта JSON и полной замены таблицы содержимым буфера.
 
 import { toJson } from '../../integration/export/toJson.js';
 import { parseTableJson, applyImportedDocument } from '../../integration/import/fromJson.js';
@@ -22,15 +21,14 @@ export function setupImportExportUI(ctx) {
   const { model, history, validator, bus } = ctx;
   const container = document.createElement('div');
   container.className = 'tablegen-import-export';
+  container.classList.add('mt-4','p-3','bg-white','border','border-gray-200','rounded','flex','flex-wrap','items-start','gap-2');
 
   // Кнопка ручной вставки из буфера (замена глобальному Ctrl+V)
   const pasteBtn = document.createElement('button');
   pasteBtn.textContent = 'Вставить из буфера';
-  pasteBtn.style.marginRight = '8px';
+  pasteBtn.classList.add('tg-btn','tg-btn-primary');
   pasteBtn.addEventListener('click', async () => {
-    // Для джуниора: новая логика — ПОЛНАЯ ЗАМЕНА текущей таблицы содержимым буфера.
-    // Мы НЕ «вставляем в (0,0)», а строим новый документ и применяем его через model.applyDocument.
-    // Это даёт чистую структуру (стираем старые ячейки, headerRows, columnSizes) и корректный undo.
+  // Полная замена текущей таблицы содержимым буфера через новый документ (reset структуры + корректный undo).
     if (!navigator.clipboard) {
       alert('Clipboard API недоступно в этом браузере');
       return;
@@ -129,6 +127,7 @@ export function setupImportExportUI(ctx) {
   // Кнопка экспорта
   const exportBtn = document.createElement('button');
   exportBtn.textContent = 'Экспорт JSON (console)';
+  exportBtn.classList.add('tg-btn');
   exportBtn.addEventListener('click', () => {
     const json = toJson(model);
     console.log('EXPORT JSON:\n', json);
@@ -139,11 +138,11 @@ export function setupImportExportUI(ctx) {
   const importArea = document.createElement('textarea');
   importArea.placeholder = 'Вставьте сюда JSON таблицы и нажмите "Импорт JSON"';
   importArea.rows = 4;
-  importArea.style.width = '400px';
-  importArea.style.display = 'block';
-  importArea.style.marginTop = '8px';
+  // Tailwind оформление для textarea вместо inline стилей
+  importArea.classList.add('w-96','block','mt-2','p-2','border','border-gray-300','rounded','font-mono','text-sm','resize-y');
   const importBtn = document.createElement('button');
   importBtn.textContent = 'Импорт JSON';
+  importBtn.classList.add('tg-btn');
   importBtn.addEventListener('click', () => {
     const raw = importArea.value.trim();
     if (!raw) {

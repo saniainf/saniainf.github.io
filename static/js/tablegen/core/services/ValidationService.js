@@ -1,6 +1,5 @@
 // ValidationService.js
-// Сервис валидации документа таблицы и проверки корректности данных.
-// Для джуниора: централизованная валидация предотвращает появление некорректных состояний.
+// Сервис централизованной валидации структуры и данных таблицы (целостность, merge-конфликты, реестр классов/атрибутов).
 
 /**
  * ValidationService отвечает за:
@@ -132,6 +131,8 @@ export class ValidationService {
     this._exclusiveGroups.clear();
     this._attrMap.clear();
     if (!registry) return;
+    // ВНИМАНИЕ: UI метаданные (label, description, valueLabels) намеренно игнорируются валидатором,
+    // так как они не влияют на строгую семантику данных и не участвуют в импорт/экспорт формате.
     if (registry.classes) {
       for (const cls of registry.classes) {
         this._classSet.add(cls.name);
@@ -259,6 +260,15 @@ export class ValidationService {
    */
   listAllowedAttributes() {
     return this._registry ? this._registry.dataAttributes.slice() : [];
+  }
+
+  /**
+   * Атрибуты, помеченные для быстрого переключения (только enum/boolean).
+   * @returns {Array<object>}
+   */
+  listQuickToggleAttributes() {
+    if (!this._registry || !Array.isArray(this._registry.dataAttributes)) return [];
+    return this._registry.dataAttributes.filter(attr => attr && attr.quickToggle === true && (attr.type === 'enum' || attr.type === 'boolean'));
   }
 
   /**

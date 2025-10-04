@@ -1,7 +1,5 @@
 // applyDocument.test.js
-// Тесты метода TableModel.applyDocument
-// Для джуниора: проверяем три основных сценария — нормальное применение с событием,
-// применение без события (emitEvent:false) и отказ при некорректном документе.
+// Тесты TableModel.applyDocument: с событием, без события (emitEvent:false), отказ на некорректном документе.
 
 import { EventBus } from '../core/events/EventBus.js';
 import { TableModel } from '../core/model/TableModel.js';

@@ -1,6 +1,7 @@
 // SidePanel.js
 // Панель редактирования classes и data-* атрибутов выбранной ячейки.
 // Выделена из init.js для снижения сложности основной функции запуска.
+import { getClassLabel, getAttrLabel, getEnumValueLabel } from '../config/registry.display.js';
 
 /**
  * Класс панели справа: позволяет просматривать и редактировать классы и data-* атрибуты
@@ -21,10 +22,15 @@ export class SidePanel {
     this.bus = bus;
     this.validator = validator;
     this.selectedCellRef = null; // {r,c}
-  this.rootEl = document.createElement('div');
-  // Базовый класс панели + модификатор горизонтального режима если включён
-  const horizontal = !!options.horizontal;
-  this.rootEl.className = 'tablegen-side-panel' + (horizontal ? ' tablegen-sidepanel-horizontal' : '');
+    // Кэш последних введённых значений отключённых атрибутов.
+    // Ключ: имя атрибута, значение: последнее пользовательское значение (типизированное).
+    this.attrValueCache = {};
+    this.rootEl = document.createElement('div');
+    // Базовый класс панели + модификатор горизонтального режима если включён
+    const horizontal = !!options.horizontal;
+    this.rootEl.className = 'tablegen-side-panel' + (horizontal ? ' tablegen-sidepanel-horizontal' : '');
+    // Tailwind оформление контейнера панели (фикс ширины, скролл, фон)
+    this.rootEl.classList.add('bg-white', 'border', 'border-gray-200', 'rounded', 'p-2', 'mb-2', 'flex', 'gap-2', 'overflow-y-auto');
     this._build();
     this._subscribeSelection();
   }
@@ -38,9 +44,7 @@ export class SidePanel {
    * @param {(cell:object, r:number, c:number)=>void} fn Функция обработки ячейки
    */
   /**
-   * Унифицированный обход ячеек для массовых операций (классы, data-*).
-   * Для джуниора: мы не хотим дублировать логику определения диапазона в каждом месте,
-   * поэтому выносим сюда. Если диапазона нет — действуем на одну текущую ячейку.
+   * Унифицированный обход ячеек для массовых операций (классы, data-*). Если диапазона нет — действует на текущую ячейку.
    * @param {(cell:object, r:number, c:number)=>void} fn Колбек обработки
    */
   _forEachLeadCellInRange(fn) {
@@ -64,23 +68,23 @@ export class SidePanel {
   }
 
   _build() {
-  const panel = this.rootEl; // Основной контейнер теперь стилизуется через CSS классы
+    const panel = this.rootEl; // Основной контейнер теперь стилизуется через CSS классы
 
     // Убрали общий заголовок панели по требованию — панель начинается сразу с мета-блока
 
     // --- Общие параметры таблицы: имя и количество строк шапки ---
-  const metaWrap = document.createElement('div');
-  metaWrap.className = 'tg-sp-meta'; // Теперь вертикальная колонка: Имя / Строк шапки / Выбрана ячейка
+    const metaWrap = document.createElement('div');
+    metaWrap.className = 'tg-sp-meta'; // Теперь вертикальная колонка: Имя / Строк шапки / Выбрана ячейка
 
     // Поле для имени таблицы
     const nameLabel = document.createElement('label');
     nameLabel.textContent = 'Имя:';
-  nameLabel.className = 'tg-sp-field';
+    nameLabel.className = 'tg-sp-field';
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.placeholder = 'Название таблицы';
     nameInput.value = this.model.meta?.name || '';
-  nameInput.className = 'tg-sp-input tg-sp-input-text';
+    nameInput.className = 'tg-sp-input tg-sp-input-text tg-input';
     nameInput.addEventListener('change', () => {
       this.model.setTableName(nameInput.value);
     });
@@ -89,12 +93,12 @@ export class SidePanel {
     // Поле для количества строк шапки
     const headerLabel = document.createElement('label');
     headerLabel.textContent = 'Строк шапки:';
-  headerLabel.className = 'tg-sp-field';
+    headerLabel.className = 'tg-sp-field';
     const headerInput = document.createElement('input');
     headerInput.type = 'number';
     headerInput.min = '0';
     headerInput.step = '1';
-  headerInput.className = 'tg-sp-input tg-sp-input-number';
+    headerInput.className = 'tg-sp-input tg-sp-input-number tg-input tg-input-number';
     headerInput.value = String(this.model.grid.headerRows || 0);
     headerInput.addEventListener('change', () => {
       this.model.setHeaderRows(parseInt(headerInput.value, 10) || 0);
@@ -104,11 +108,11 @@ export class SidePanel {
     metaWrap.appendChild(nameLabel);
     metaWrap.appendChild(headerLabel);
     // Блок информации о выбранной ячейке
-  const selWrap = document.createElement('div');
-  selWrap.className = 'tg-sp-field tg-sp-field-inline'; // одна линия: метка + значение
-  const selLabel = document.createElement('span'); selLabel.textContent = 'Выбрана:'; selLabel.className = 'tg-sp-selected-label';
-  const selValue = document.createElement('span'); selValue.textContent = 'нет'; selValue.className = 'tg-sp-selected-info';
-  selWrap.appendChild(selLabel); selWrap.appendChild(selValue);
+    const selWrap = document.createElement('div');
+    selWrap.className = 'tg-sp-field tg-sp-field-inline'; // одна линия: метка + значение
+    const selLabel = document.createElement('span'); selLabel.textContent = 'Выбрана:'; selLabel.className = 'tg-sp-selected-label';
+    const selValue = document.createElement('span'); selValue.textContent = 'нет'; selValue.className = 'tg-sp-selected-info';
+    selWrap.appendChild(selLabel); selWrap.appendChild(selValue);
     metaWrap.appendChild(selWrap);
     this.selectedInfoEl = selValue; // Сохраняем ссылку только на значение
     panel.appendChild(metaWrap);
@@ -165,12 +169,12 @@ export class SidePanel {
           }
           // enabled = true
           let valToStore = current[attrName];
-            if (valToStore === undefined) {
-              // Заполняем дефолтом или авто-значением
-              if (valueMeta.type === 'enum') valToStore = valueMeta.default ?? valueMeta.values[0];
-              else if (valueMeta.type === 'number') valToStore = valueMeta.default ?? (valueMeta.min != null ? valueMeta.min : 0);
-              else if (valueMeta.type === 'boolean') valToStore = valueMeta.default ?? false;
-            }
+          if (valToStore === undefined) {
+            // Заполняем дефолтом или авто-значением
+            if (valueMeta.type === 'enum') valToStore = valueMeta.default ?? valueMeta.values[0];
+            else if (valueMeta.type === 'number') valToStore = valueMeta.default ?? (valueMeta.min != null ? valueMeta.min : 0);
+            else if (valueMeta.type === 'boolean') valToStore = valueMeta.default ?? false;
+          }
           // Если нам передали конкретное новое значение (valueMeta._newValue) используем его
           if (valueMeta && Object.prototype.hasOwnProperty.call(valueMeta, '_newValue')) {
             valToStore = valueMeta._newValue;
@@ -192,7 +196,7 @@ export class SidePanel {
       this.classControlsEl.innerHTML = '';
       const allowed = this.validator.listAllowedClasses();
       if (!allowed.length) {
-  const empty = document.createElement('div'); empty.textContent = '(нет определённых классов)'; empty.className = 'tg-sp-empty';
+        const empty = document.createElement('div'); empty.textContent = '(нет определённых классов)'; empty.className = 'tg-sp-empty';
         this.classControlsEl.appendChild(empty); return;
       }
       // Группируем по group
@@ -205,12 +209,18 @@ export class SidePanel {
       const current = cell && Array.isArray(cell.classes) ? cell.classes : [];
       const normalizedCurrent = this.validator.normalizeClassList(current);
       for (const [grp, list] of byGroup.entries()) {
-  const grpBox = document.createElement('div');
-  grpBox.className = 'tg-sp-class-group';
-  const grpTitle = document.createElement('div'); grpTitle.textContent = 'Группа: ' + grp; grpTitle.className = 'tg-sp-class-group-title';
+        // Создаём контейнер группы
+        const grpBox = document.createElement('div');
+        grpBox.className = 'tg-sp-class-group';
+        const grpTitle = document.createElement('div'); grpTitle.textContent = 'Группа: ' + grp; grpTitle.className = 'tg-sp-class-group-title';
         grpBox.appendChild(grpTitle);
+
+        // Внутренний wrapper для элементов (сеткой по 3 строки в столбце)
+        const itemsWrap = document.createElement('div');
+        itemsWrap.className = 'tg-sp-class-items';
+
         list.forEach(clsMeta => {
-          const label = document.createElement('label'); label.className = 'tg-sp-class-item';
+          const label = document.createElement('label'); label.className = 'tg-sp-class-item tg-checkbox-inline';
           const cb = document.createElement('input'); cb.type = 'checkbox';
           cb.checked = normalizedCurrent.includes(clsMeta.name);
           cb.addEventListener('change', () => {
@@ -225,83 +235,127 @@ export class SidePanel {
             // Нормализация эксклюзивных групп произойдёт в _applyClasses
             this._applyClasses(newList);
           });
-          const span = document.createElement('span'); span.textContent = clsMeta.name;
-          label.appendChild(cb); label.appendChild(span); grpBox.appendChild(label);
+          const span = document.createElement('span');
+          span.textContent = getClassLabel(clsMeta);
+          if (clsMeta.description) span.title = clsMeta.description;
+          label.appendChild(cb); label.appendChild(span); itemsWrap.appendChild(label);
         });
+        grpBox.appendChild(itemsWrap);
         this.classControlsEl.appendChild(grpBox);
       }
     };
 
-    // Построение UI контролов атрибутов
+    // Построение UI контролов атрибутов (всегда рендерим редакторы и просто отключаем их)
     this._buildAttrControls = (cell) => {
       this.attrControlsEl.innerHTML = '';
       const allowed = this.validator.listAllowedAttributes();
       if (!allowed.length) {
-  const empty = document.createElement('div'); empty.textContent = '(нет определённых data-* атрибутов)'; empty.className = 'tg-sp-empty';
+        const empty = document.createElement('div'); empty.textContent = '(нет определённых data-* атрибутов)'; empty.className = 'tg-sp-empty';
         this.attrControlsEl.appendChild(empty); return;
       }
       const cellData = (cell && cell.data) ? cell.data : {};
       allowed.forEach(meta => {
-  const row = document.createElement('div'); row.className = 'tg-sp-attr-row';
-        const enable = document.createElement('input'); enable.type = 'checkbox'; enable.title = 'Включить/отключить атрибут';
+        const row = document.createElement('div'); row.className = 'tg-sp-attr-row';
+        const enable = document.createElement('input'); enable.type = 'checkbox'; enable.title = 'Включить/отключить атрибут'; enable.classList.add('align-middle');
         const isEnabled = meta.name in cellData;
         enable.checked = isEnabled;
-  const label = document.createElement('span'); label.textContent = meta.name; label.className = 'tg-sp-attr-label';
-        // Контейнер редактора значения
-  const editorWrap = document.createElement('div'); editorWrap.className = 'tg-sp-attr-editor';
+        const label = document.createElement('span');
+        label.textContent = getAttrLabel(meta);
+        label.className = 'tg-sp-attr-label';
+        if (meta.description) label.title = meta.description;
+        // Клик по названию атрибута теперь переключает чекбокс (аналог <label for>)
+        label.addEventListener('click', (e) => {
+          e.preventDefault();
+          enable.checked = !enable.checked;
+          enable.dispatchEvent(new Event('change', { bubbles: false }));
+        });
+        const editorWrap = document.createElement('div'); editorWrap.className = 'tg-sp-attr-editor';
 
-        const buildValueEditor = () => {
-          editorWrap.innerHTML = '';
-          if (!enable.checked) return; // атрибут выключен — не рендерим редактор
-          let value = cellData[meta.name];
-          if (value === undefined) {
-            if (meta.type === 'enum') value = meta.default ?? meta.values[0];
-            else if (meta.type === 'number') value = meta.default ?? (meta.min != null ? meta.min : 0);
-            else if (meta.type === 'boolean') value = meta.default ?? false;
-          }
-          if (meta.type === 'enum') {
-            const sel = document.createElement('select');
-            meta.values.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
-            sel.value = value;
-            sel.addEventListener('change', () => {
+        // Определяем исходное значение: приоритет — данные ячейки, затем кэш, затем дефолт
+        let value;
+        if (meta.name in cellData) value = cellData[meta.name];
+        else if (meta.name in this.attrValueCache) value = this.attrValueCache[meta.name];
+        else {
+          if (meta.type === 'enum') value = meta.default ?? meta.values[0];
+          else if (meta.type === 'number') value = meta.default ?? (meta.min != null ? meta.min : 0);
+          else if (meta.type === 'boolean') value = meta.default ?? false;
+        }
+
+        // Создаём постоянный editor согласно типу
+        let editorEl;
+        if (meta.type === 'enum') {
+          const sel = document.createElement('select'); sel.classList.add('tg-select', 'tg-input-sm');
+          meta.values.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = getEnumValueLabel(meta, v); sel.appendChild(o); });
+          sel.value = value;
+          sel.addEventListener('change', () => {
+            this.attrValueCache[meta.name] = sel.value; // сохраняем в кэш
+            if (enable.checked) {
               this._applyAttribute(meta.name, true, { ...meta, _newValue: sel.value });
-            });
-            editorWrap.appendChild(sel);
-          } else if (meta.type === 'number') {
-            const inp = document.createElement('input'); inp.type = 'number';
-            if (meta.min != null) inp.min = String(meta.min);
-            if (meta.max != null) inp.max = String(meta.max);
-            inp.value = String(value);
-            inp.style.width = '80px';
-            inp.addEventListener('change', () => {
-              let num = Number(inp.value);
-              if (Number.isNaN(num)) num = meta.min != null ? meta.min : 0;
-              if (meta.min != null && num < meta.min) num = meta.min;
-              if (meta.max != null && num > meta.max) num = meta.max;
-              this._applyAttribute(meta.name, true, { ...meta, _newValue: num });
-            });
-            editorWrap.appendChild(inp);
-          } else if (meta.type === 'boolean') {
-            const sel = document.createElement('select');
-            ['false','true'].forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
-            sel.value = value ? 'true' : 'false';
-            sel.addEventListener('change', () => {
-              this._applyAttribute(meta.name, true, { ...meta, _newValue: sel.value === 'true' });
-            });
-            editorWrap.appendChild(sel);
-          }
-        };
+            }
+          });
+          editorEl = sel;
+        } else if (meta.type === 'number') {
+          const inp = document.createElement('input'); inp.type = 'number'; inp.classList.add('tg-input', 'tg-input-sm', 'tg-input-number');
+          if (meta.min != null) inp.min = String(meta.min);
+          if (meta.max != null) inp.max = String(meta.max);
+          inp.value = String(value);
+          inp.style.width = '80px';
+          inp.addEventListener('change', () => {
+            let num = Number(inp.value);
+            if (Number.isNaN(num)) num = meta.min != null ? meta.min : 0;
+            if (meta.min != null && num < meta.min) num = meta.min;
+            if (meta.max != null && num > meta.max) num = meta.max;
+            this.attrValueCache[meta.name] = num;
+            if (enable.checked) this._applyAttribute(meta.name, true, { ...meta, _newValue: num });
+          });
+          editorEl = inp;
+        } else if (meta.type === 'boolean') {
+          const sel = document.createElement('select'); sel.classList.add('tg-select', 'tg-input-sm');
+          ['false', 'true'].forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+          sel.value = value ? 'true' : 'false';
+          sel.addEventListener('change', () => {
+            const boolVal = sel.value === 'true';
+            this.attrValueCache[meta.name] = boolVal;
+            if (enable.checked) this._applyAttribute(meta.name, true, { ...meta, _newValue: boolVal });
+          });
+          editorEl = sel;
+        }
+        if (editorEl) editorWrap.appendChild(editorEl);
 
+        // Первичное применение если атрибут включён и значения ещё нет в cellData (например из кэша)
+        if (enable.checked && !(meta.name in cellData)) {
+          this.attrValueCache[meta.name] = value;
+          this._applyAttribute(meta.name, true, { ...meta, _newValue: value });
+        }
+
+        // Обработчик включения/выключения
         enable.addEventListener('change', () => {
           if (!enable.checked) {
+            // Сохраняем текущее значение в кэш и удаляем из модели
+            if (editorEl) {
+              let stored;
+              if (meta.type === 'enum') stored = editorEl.value;
+              else if (meta.type === 'number') stored = Number(editorEl.value);
+              else if (meta.type === 'boolean') stored = editorEl.value === 'true';
+              this.attrValueCache[meta.name] = stored;
+            }
             this._applyAttribute(meta.name, false, meta);
+            if (editorEl) editorEl.disabled = true;
           } else {
-            buildValueEditor();
-            // Первичное включение — применяем дефолт
-            this._applyAttribute(meta.name, true, meta);
+            // Восстанавливаем из кэша или дефолта и применяем
+            let restore = this.attrValueCache.hasOwnProperty(meta.name) ? this.attrValueCache[meta.name] : value;
+            if (editorEl) {
+              if (meta.type === 'boolean') editorEl.value = restore ? 'true' : 'false';
+              else editorEl.value = String(restore);
+              editorEl.disabled = false;
+            }
+            this._applyAttribute(meta.name, true, { ...meta, _newValue: restore });
           }
         });
-        buildValueEditor();
+
+        // Отключаем editor если атрибут выключен
+        if (!enable.checked && editorEl) editorEl.disabled = true;
+
         row.appendChild(enable); row.appendChild(label); row.appendChild(editorWrap);
         this.attrControlsEl.appendChild(row);
       });
@@ -351,12 +405,12 @@ export class SidePanel {
       const multi = (r1 !== r2) || (c1 !== c2);
       if (multi) {
         // Переключаем в пользовательский (1-based) формат
-        this.selectedInfoEl.textContent = '(' + (r1+1) + ',' + (c1+1) + ') - (' + (r2+1) + ',' + (c2+1) + ')';
+        this.selectedInfoEl.textContent = '(' + (r1 + 1) + ',' + (c1 + 1) + ') - (' + (r2 + 1) + ',' + (c2 + 1) + ')';
       } else {
-        this.selectedInfoEl.textContent = '(' + (r1+1) + ',' + (c1+1) + ')';
+        this.selectedInfoEl.textContent = '(' + (r1 + 1) + ',' + (c1 + 1) + ')';
       }
     } else {
-      this.selectedInfoEl.textContent = '(' + (this.selectedCellRef.r+1) + ',' + (this.selectedCellRef.c+1) + ')';
+      this.selectedInfoEl.textContent = '(' + (this.selectedCellRef.r + 1) + ',' + (this.selectedCellRef.c + 1) + ')';
     }
     const cell = this.model.getCell(this.selectedCellRef.r, this.selectedCellRef.c);
     this._buildClassControls(cell);

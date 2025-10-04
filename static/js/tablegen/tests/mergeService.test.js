@@ -1,6 +1,5 @@
 // mergeService.test.js
-// Ручные тесты логики merge / split. Запускаются аналогично paste тестам.
-// Для джуниора: здесь мы НЕ используем фреймворк тестирования, а просто бросаем ошибки при несоответствии.
+// Ручные тесты логики merge / split (без тестового фреймворка — ошибки через assert).
 
 import { EventBus } from '../core/events/EventBus.js';
 import { TableModel } from '../core/model/TableModel.js';
@@ -106,10 +105,7 @@ export function testSplitAllInRange() {
 }
 
 /**
- * Тест режима fully для splitAllInRange.
- * Для джуниора: в режиме 'fully' мы должны разъединять ТОЛЬКО те объединения,
- * которые целиком лежат внутри выделенного диапазона. Частично пересекающиеся
- * области (как (0,0)-(1,1) в нашем примере) остаются нетронутыми.
+ * Тест режима fully: разъединяются только полностью включённые объединения, частичные остаются.
  */
 export function testSplitAllInRangeFullyMode() {
   const { model, validator } = createModel(8,8);
@@ -134,8 +130,7 @@ export function testSplitAllInRangeFullyMode() {
 }
 
 export function testConsumeExistingMerge() {
-  // Для джуниора: сценарий когда мы сначала делаем небольшой merge,
-  // а затем пытаемся объединить бОльший диапазон, полностью покрывающий его.
+  // Сценарий: сначала маленький merge, затем поглощающее объединение большего диапазона.
   const { model, validator } = createModel(6,6);
   let v = validator.validateMergeOperation(1,1,2,2); assert(v.ok); mergeRange(model,1,1,2,2);
   // Теперь объединяем больший диапазон, который целиком содержит предыдущий merge
@@ -148,9 +143,7 @@ export function testConsumeExistingMerge() {
 }
 
 /**
- * Тест объединения текстовых значений при merge.
- * Для джуниора: значения всех ячеек диапазона собираются сверху вниз, слева направо,
- * пустые и состоящие только из пробелов пропускаются, затем соединяются через один пробел.
+ * Тест объединения текстовых значений: собираются сверху-вниз, слева-направо; пустые/пробельные пропускаются; join через пробел.
  */
 export function testMergeValueConcatenation() {
   const { model } = createModel(4,4);

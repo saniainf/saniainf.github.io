@@ -25,6 +25,9 @@ import { ValidationService } from '../core/services/ValidationService.js';
 import { RenderScheduler } from './RenderScheduler.js';
 import { setupHotkeys } from './init/setupHotkeys.js';
 import { setupRowColSelection } from './init/setupRowColSelection.js';
+// Панель форматирования (обёртка текста тегами i/u/sup/sub/br)
+import { setupFormattingBar } from './init/setupFormattingBar.js';
+import { setupQuickAttributesBar } from './init/setupQuickAttributesBar.js';
 // Реестр предопределённых классов и data-* атрибутов (core + project)
 // Переходим к динамической модели: проектный реестр (project registry) передаётся извне (HTML) или через options.
 // Здесь импортируем только CORE_REGISTRY. Слияние выполняем локально.
@@ -99,7 +102,12 @@ export function initTableGen(rootElementId, options = {}) {
   const root = document.getElementById(rootElementId);
   if (!root) { console.error('[initTableGen] Не найден root элемент', rootElementId); return { model, bus }; }
   const renderer = new TableRenderer(model, bus);
-  root.appendChild(renderer.tableEl);
+  // Оборачиваем таблицу в горизонтальный scroll-контейнер, чтобы при недостатке ширины
+  // прокручивалась только таблица, а верхние панели оставались на месте.
+  const tableScrollWrap = document.createElement('div');
+  tableScrollWrap.className = 'tablegen-table-scroll';
+  tableScrollWrap.appendChild(renderer.tableEl);
+  root.appendChild(tableScrollWrap);
 
 
   // 5. RenderScheduler: гарантирует 1 перерисовку за кадр + восстановление выделения после render
@@ -136,7 +144,25 @@ export function initTableGen(rootElementId, options = {}) {
 
   // 11. Панель действий (merge / split / вставки) перемещена ПОД SidePanel
   const actionsBar = setupActionBar({ model, selectionService, validator, bus });
-  root.insertBefore(actionsBar.element, renderer.tableEl);
+  // Оборачиваем action bar + formatting bar в общий контейнер, чтобы выровнять форматирование справа
+  const actionsWrapper = document.createElement('div');
+  actionsWrapper.className = 'flex w-full items-start gap-2 mb-2';
+  actionsWrapper.appendChild(actionsBar.element);
+  const formattingBar = setupFormattingBar({ inlineEditor });
+  actionsWrapper.appendChild(formattingBar.element);
+  // Вставляем actionsWrapper перед scroll-контейнером таблицы
+  root.insertBefore(actionsWrapper, tableScrollWrap);
+
+  const quickAttrsBar = setupQuickAttributesBar({ validator, selectionService, model, renderer, bus });
+  if (!quickAttrsBar.element.classList.contains('hidden')) {
+  root.insertBefore(quickAttrsBar.element, tableScrollWrap);
+  }
+
+  // Подписка на события начала/завершения редактирования для активизации кнопок форматирования
+  bus.on('edit:start', () => formattingBar.updateState());
+  bus.on('edit:commit', () => formattingBar.updateState());
+  bus.on('edit:cancel', () => formattingBar.updateState());
+  formattingBar.updateState();
 
   // 12. Горячие клавиши (Undo/Redo) — поддержка разных раскладок клавиатуры
   const hotkeys = setupHotkeys({ history, model, inlineEditor, scheduler, bus, selectionService });
@@ -150,5 +176,5 @@ export function initTableGen(rootElementId, options = {}) {
   // 15. Тестовые кнопки (dev only) — легко отключить при сборке в продакшн
   const testButtons = setupTestButtons(document.body);
 
-  return { model, bus, render: () => scheduler.flush(), history, inlineEditor, sidePanel, selectionService, validator, scheduler, hotkeys, rowColSelection, testButtons, registry: finalRegistry };
+  return { model, bus, render: () => scheduler.flush(), history, inlineEditor, sidePanel, selectionService, validator, scheduler, hotkeys, rowColSelection, testButtons, registry: finalRegistry, quickAttrsBar };
 }

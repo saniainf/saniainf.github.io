@@ -1,7 +1,6 @@
 // registryValidation.test.js
 // Тесты STRICT реестра: проверяем импорт, классы, атрибуты, exclusive группы, включение/выключение.
-// Для джуниора: эти тесты не используют полноценный test runner — их можно запускать вручную,
-// импортируя функцию runRegistryTests() из консоли. Ошибки выбрасываются через assert.
+// Лёгкие ручные тесты: запускаются через импорт и вызов runRegistryTests(); проверки через assert.
 
 import { EventBus } from '../core/events/EventBus.js';
 import { TableModel } from '../core/model/TableModel.js';

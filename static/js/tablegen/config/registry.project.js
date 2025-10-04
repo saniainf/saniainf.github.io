@@ -4,12 +4,13 @@
 export const PROJECT_REGISTRY = {
   version: 1,
   classes: [
-    { name: 'warning', group: 'visual' },
-    { name: 'accent', group: 'visual' }
+    { name: 'color-warning', group: 'visual' },
+    { name: 'color-accent', group: 'visual' },
+    { name: 'color-gray', label: 'Серый', group: 'visual' }
   ],
   dataAttributes: [
     { name: 'data-weight', type: 'number', min: 0, max: 100, default: 0 },
-    { name: 'data-flag', type: 'boolean', default: false }
+    { name: 'data-flag', label: 'Флаг', type: 'boolean', default: false, quickToggle: true }
   ],
   rules: {
     // Может расширять или уточнять правила, сейчас оставляем пустым — будет объединено.

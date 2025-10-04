@@ -1,0 +1,62 @@
+/* Входной файл Tailwind. Здесь можно добавлять кастомные слои */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Базовый типографический слой: шрифты, сглаживание, базовые размеры */
+@layer base {
+  html { font-family: theme('fontFamily.sans'); }
+  body { @apply text-gray-800 antialiased text-[14px] leading-relaxed bg-gray-50; }
+  h1, h2, h3 { @apply font-semibold text-gray-900; }
+  h1 { @apply text-2xl mt-4 mb-3; }
+  h2 { @apply text-xl mt-3 mb-2; }
+  h3 { @apply text-lg mt-3 mb-2; }
+  p { @apply mb-3; }
+  code { @apply font-mono text-[13px]; }
+  pre code { @apply text-[13px]; }
+  a { @apply text-tg-primary; }
+  a:hover { @apply underline; }
+}
+
+/* Кастомные компоненты (пример). Используем слой components чтобы их можно было переопределить позже. */
+@layer components {
+  .tg-btn {
+    @apply inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .tg-btn-primary {
+    @apply tg-btn border-tg-primary bg-tg-primary text-white hover:bg-blue-600 active:bg-blue-700;
+  }
+  .tg-quick-btn {
+    @apply tg-btn px-2 py-0.5 text-xs;
+  }
+  .tg-quick-btn-active {
+    @apply border-tg-primary bg-tg-primary/10 text-tg-primary;
+  }
+  .tg-badge {
+    @apply inline-block rounded bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700;
+  }
+  /* Inline input в ячейке: убираем рамку, скругление, доп. фон и любые ring/outline */
+  .tablegen-edit-input {
+    @apply px-0 py-0 m-0 border-0 rounded-none bg-transparent shadow-none focus:outline-none focus:ring-0 w-full leading-[inherit];
+    font: inherit; /* Наследуем семейство и размер шрифта */
+    color: inherit; /* Наследуем цвет текста из ячейки */
+  }
+  /* Единый стиль инпутов панели */
+  .tg-input {
+    @apply w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-tg-primary/40 focus:border-tg-primary transition;
+  }
+  .tg-input-sm { @apply px-1 py-0.5 text-xs; }
+  .tg-input-number { @apply text-right; }
+  .tg-select { @apply tg-input pr-6 cursor-pointer; }
+  .tg-checkbox-inline { @apply inline-flex items-center gap-1 text-xs text-gray-700 select-none; }
+}
+
+/* Утилита подсветки выделения (пример) */
+@layer utilities {
+  .tg-cell-selected { @apply outline outline-2 outline-tg-accent; }
+}
+
+/* Компонент расширенной типографики без ограничений ширины */
+@layer components {
+  .tg-prose { @apply prose prose-sm max-w-none; }
+}

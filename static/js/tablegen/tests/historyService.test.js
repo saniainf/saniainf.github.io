@@ -1,6 +1,5 @@
 // historyService.test.js
-// Тесты истории: базовый undo/redo, redo сбрасывается после новой правки, debounce группировка.
-// Для джуниора: мы максимально изолируем тест от UI — работаем только с моделью и сервисами.
+// Тесты истории: undo/redo, сброс redo после новой правки, debounce группировка (UI не используется).
 
 import { EventBus } from '../core/events/EventBus.js';
 import { TableModel } from '../core/model/TableModel.js';

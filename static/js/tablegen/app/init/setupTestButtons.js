@@ -1,7 +1,5 @@
 // setupTestButtons.js
-// Отвечает за создание и добавление в DOM кнопок запуска тестов.
-// Для джуниора: вынос тестовых кнопок уменьшает init.js и делает возможным
-// отключение тестового UI в продакшене одной строкой.
+// Кнопки запуска тестовых наборов (ленивая загрузка модулей, можно отключить единым местом).
 
 // Импорты удалены: теперь используем динамический импорт для ленивой загрузки тестовых модулей.
 
@@ -12,9 +10,12 @@
  */
 export function setupTestButtons(targetEl) {
   // Одна универсальная кнопка запуска ВСЕХ тестов.
+  // Контейнер-обёртка для кнопок: flex + gap вместо индивидуальных marginRight.
+  const wrap = document.createElement('div');
+  wrap.classList.add('flex','flex-wrap','gap-2','mt-2');
   const btn = document.createElement('button');
   btn.textContent = 'Run All Tests';
-  btn.style.marginRight = '8px';
+  btn.classList.add('tg-btn','tg-btn-primary');
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     btn.textContent = 'Running tests...';
@@ -60,7 +61,7 @@ export function setupTestButtons(targetEl) {
   // Дополнительная кнопка для изолированного запуска только inline editor tests (быстрая отладка)
   const btnInline = document.createElement('button');
   btnInline.textContent = 'Inline Tests';
-  btnInline.style.marginRight = '8px';
+  btnInline.classList.add('tg-btn');
   btnInline.addEventListener('click', async () => {
     btnInline.disabled = true;
     const original = btnInline.textContent;
@@ -78,12 +79,12 @@ export function setupTestButtons(targetEl) {
     }
   });
 
-  targetEl.appendChild(btn);
-  targetEl.appendChild(btnInline);
+  wrap.appendChild(btn);
+  wrap.appendChild(btnInline);
   // Кнопка для запуска только structure (insert/delete) тестов
   const btnStructure = document.createElement('button');
   btnStructure.textContent = 'Structure Tests';
-  btnStructure.style.marginRight = '8px';
+  btnStructure.classList.add('tg-btn');
   btnStructure.addEventListener('click', async () => {
     // Блокируем кнопку на время выполнения, чтобы избежать повторных запусков
     btnStructure.disabled = true;
@@ -104,11 +105,11 @@ export function setupTestButtons(targetEl) {
     }
   });
 
-  targetEl.appendChild(btnStructure);
+  wrap.appendChild(btnStructure);
   // Кнопка для history тестов структурных операций (insert/delete undo)
   const btnStructHist = document.createElement('button');
   btnStructHist.textContent = 'Struct History Tests';
-  btnStructHist.style.marginRight = '8px';
+  btnStructHist.classList.add('tg-btn');
   btnStructHist.addEventListener('click', async () => {
     btnStructHist.disabled = true;
     const orig = btnStructHist.textContent;
@@ -126,6 +127,7 @@ export function setupTestButtons(targetEl) {
       btnStructHist.textContent = orig;
     }
   });
-  targetEl.appendChild(btnStructHist);
+  wrap.appendChild(btnStructHist);
+  targetEl.appendChild(wrap);
   return { buttons: [btn, btnInline, btnStructure, btnStructHist] };
 }

@@ -1,6 +1,5 @@
 // HistoryDebounce.js
-// Класс-обёртка для отложенной (debounce) записи состояния модели в HistoryService.
-// Снижает количество snapshot'ов при массовых операциях (вставка, импорт, merge большого блока).
+// Debounce-запись состояния модели в HistoryService: снижает количество snapshot при серии операций.
 
 /**
  * Использование:
@@ -12,8 +11,7 @@ export class HistoryDebounceRecorder {
   /**
    * @param {HistoryService} history История undo/redo
    * @param {TableModel} model Текущая модель
-   * @param {number} [delay=75] Задержка (мс) перед фиксацией snapshot после последнего события.
-   * Для джуниора: меньше задержка => быстрее пишем в историю, больше => лучше группируем серию изменений.
+   * @param {number} [delay=75] Задержка (мс) перед фиксацией snapshot после последнего события (степень группировки).
    */
   constructor(history, model, delay = 75, bus = null) {
     this.history = history;
@@ -23,10 +21,7 @@ export class HistoryDebounceRecorder {
     this._pending = false; // есть ли в принципе отложенная запись
     this._bus = bus;      // Ссылка на EventBus (если передана) для синхронизации с batch
 
-    // Если есть bus — подписываемся на окончание batch, чтобы зафиксировать состояние немедленно.
-    // Для джуниора: это значит, что серия массовых операций (например добавление класса в
-    // десятки ячеек) сохранится одним снимком истории сразу по завершении batch,
-    // а не по таймеру.
+  // Подписываемся на окончание batch, чтобы зафиксировать состояние немедленно одним снимком.
     if (this._bus && typeof this._bus.on === 'function') {
       this._bus.on('batch:flush', () => {
         // Если были запланированы изменения (pending) — flush сделает snapshot.

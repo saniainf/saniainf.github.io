@@ -2,6 +2,8 @@
 // Отвечает за создание и перерисовку HTML <table> на основе модели.
 // Для упрощения поддержки логика рендера изолирована от остального кода.
 
+import { renderCellHtml } from '../core/utils/renderValue.js';
+
 /**
  * Класс отвечает только за отображение таблицы.
  * При изменении модели вызывайте renderer.render().
@@ -22,8 +24,7 @@ export class TableRenderer {
     this.tbody = document.createElement('tbody');
     this.tableEl.appendChild(this.thead);
     this.tableEl.appendChild(this.tbody);
-    // Кэш покрытых координат (строка+запятая+колонка). Заполняется при каждом render().
-    // Для джуниора: цель — ускорить проверку скрытых merge ячеек с O(N * merges) до O(1) по времени запроса.
+  // Кэш покрытых координат (строка+запятая+колонка). Ускоряет проверку скрытых merge ячеек до O(1).
     this._covered = new Set();
   }
 
@@ -127,7 +128,7 @@ export class TableRenderer {
             const td = document.createElement('td');
             const rowSpan = cell.rowSpan || 1;
             const colSpan = cell.colSpan || 1;
-            td.textContent = cell.value;
+            td.innerHTML = renderCellHtml(cell.value); // безопасный HTML с ограниченными тегами
             td.dataset.r = String(r);
             td.dataset.c = String(c);
             if (rowSpan > 1) td.rowSpan = rowSpan;
@@ -170,7 +171,7 @@ export class TableRenderer {
           const td = document.createElement('td');
           const rowSpan = cell.rowSpan || 1;
           const colSpan = cell.colSpan || 1;
-          td.textContent = cell.value;
+          td.innerHTML = renderCellHtml(cell.value); // безопасный HTML с ограниченными тегами
           td.dataset.r = String(r);
           td.dataset.c = String(c);
           if (rowSpan > 1) td.rowSpan = rowSpan;

@@ -143,6 +143,19 @@ export class InlineEditor {
       setTimeout(() => { this.justFinishedEditing = false; }, 0);
     };
     const onKey = (e) => {
+      // Alt+Enter: вставка <br> (перенос строки) без завершения редактирования.
+      // Реализуем раньше чем обычный Enter, чтобы не произошёл commit.
+      if (e.key === 'Enter' && e.altKey) {
+        e.preventDefault();
+        this.applyFormatting('br');
+        return;
+      }
+      // Ctrl+Enter / Cmd+Enter: тоже вставка <br> без завершения (удобно для пользователей привыкших к этой комбинации)
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.applyFormatting('br');
+        return;
+      }
       if (e.key === 'Enter') {
         e.preventDefault();
         // Убираем обработчик blur чтобы не словить двойной commit
@@ -188,12 +201,60 @@ export class InlineEditor {
   }
 
   /**
-   * Принудительно коммитит текущее редактирование, если оно есть.
-   * Для джуниора: вызывается, например, при клике по другой ячейке, чтобы сохранить введённый текст.
+   * Принудительно коммитит текущее редактирование (например при клике по другой ячейке).
    */
   commitIfAny() {
     if (this.activeEditor && typeof this.activeEditor.commit === 'function') {
       this.activeEditor.commit();
     }
+  }
+
+  /**
+   * Оборачивает текущий выделенный текст в inline input разрешённым тегом или вставляет тег.
+   * Поддерживаются: i, u, sup, sub, br. Историю не трогаем до commit.
+   * @param {string} tag i|u|sup|sub|br
+   */
+  applyFormatting(tag) {
+    if (!this.activeEditor) return false;
+    const { input } = this.activeEditor;
+    input.focus();
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? start;
+    const value = input.value;
+
+    if (tag === 'br') {
+      // Вставляем перенос. Если есть выделение — заменяем его.
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      const insert = '<br>';
+      input.value = before + insert + after;
+      const pos = before.length + insert.length;
+      input.setSelectionRange(pos, pos);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    }
+
+    const open = `<${tag}>`;
+    const close = `</${tag}>`;
+
+    if (start === end) {
+      // Нет выделения: вставляем пустую пару и ставим курсор внутрь
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      input.value = before + open + close + after;
+      const cursor = before.length + open.length;
+      input.setSelectionRange(cursor, cursor);
+    } else {
+      // Оборачиваем выделенный диапазон
+      const selText = value.slice(start, end);
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      input.value = before + open + selText + close + after;
+      const newStart = before.length + open.length;
+      const newEnd = newStart + selText.length;
+      input.setSelectionRange(newStart, newEnd);
+    }
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
   }
 }

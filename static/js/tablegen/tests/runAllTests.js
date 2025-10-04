@@ -1,7 +1,7 @@
 // runAllTests.js
 // Универсальный запуск всех ручных тестов. Можно импортировать в консоли браузера:
 // import('./static/js/tablegen/tests/runAllTests.js').then(m => m.runAllTests());
-// Для джуниора: мы просто вызываем функции из отдельных файлов тестов.
+// Запускает функции из отдельных модулей тестов (ручной лёгкий раннер без инфраструктуры).
 
 import { runPasteTests } from './pasteService.test.js';
 import { runRegistryTests } from './registryValidation.test.js';

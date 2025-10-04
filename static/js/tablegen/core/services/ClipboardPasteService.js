@@ -1,7 +1,5 @@
 // ClipboardPasteService.js
-// Сервис-обёртка над логикой вставки из буфера обмена.
-// Для джуниора: выносим код из init.js чтобы изолировать ответственность
-// и упростить тестирование.
+// Сервис обработки вставки из буфера обмена (HTML таблица или plain text) для изоляции логики от init.js.
 
 import { parseClipboardMatrix } from '../../integration/import/parseClipboardMatrix.js';
 import { parseClipboardHtmlTable } from '../../integration/import/parseClipboardHtmlTable.js';

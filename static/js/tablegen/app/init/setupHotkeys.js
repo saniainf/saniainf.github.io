@@ -1,7 +1,5 @@
 // setupHotkeys.js
-// Отвечает за регистрацию горячих клавиш undo/redo.
-// Для джуниора: вынос в отдельный модуль уменьшает размер init.js и делает возможной
-// замену или расширение горячих клавиш без правок точки входа.
+// Регистрация горячих клавиш (undo/redo, копирование/вставка значения, навигация, очистка диапазона).
 
 
 /**
@@ -33,13 +31,43 @@ export function setupHotkeys(ctx) {
 
   function handleKeyDown(e) {
     const mod = e.ctrlKey || e.metaKey; // поддержка Mac (Cmd)
+    // Горячие клавиши форматирования работают ТОЛЬКО когда активен inlineEditor
+    // и фокус внутри его input. Мы проверяем это сразу, чтобы не мешать другой логике.
+    if (inlineEditor && inlineEditor.activeEditor && inlineEditor.activeEditor.input === document.activeElement) {
+      // Ctrl+I — вставка/обёртка <i>
+      if (mod && !e.shiftKey && (e.code === 'KeyI')) {
+        e.preventDefault();
+        inlineEditor.applyFormatting('i');
+        return; // не продолжаем обработку
+      }
+      // Ctrl+U — вставка/обёртка <u>
+      if (mod && !e.shiftKey && (e.code === 'KeyU')) {
+        e.preventDefault();
+        inlineEditor.applyFormatting('u');
+        return;
+      }
+      // Ctrl+Shift+ArrowUp — <sup>
+      if (mod && e.shiftKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        inlineEditor.applyFormatting('sup');
+        return;
+      }
+      // Ctrl+Shift+ArrowDown — <sub>
+      if (mod && e.shiftKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        inlineEditor.applyFormatting('sub');
+        return;
+      }
+      // Alt+Enter обрабатывается внутри InlineEditor.onKey (там нужен доступ к Enter до commit)
+      // поэтому здесь специально НЕ перехватываем Alt+Enter.
+    }
     // Клавиатурная навигация (Этап 1): стрелки и Shift+стрелки для диапазона
-    const arrowKeys = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+    const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
     if (arrowKeys.includes(e.key) && !mod) {
       // Если активен inline редактор — не перехватываем (даём курсору двигаться в тексте)
       if (inlineEditor.activeEditor) return;
       e.preventDefault();
-      const dirMap = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right' };
+      const dirMap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
       const dir = dirMap[e.key];
       if (e.shiftKey) {
         selectionService.extendRange(dir);
@@ -85,20 +113,20 @@ export function setupHotkeys(ctx) {
           });
         } else {
           // fallback без batch
-            if (rangeRect) {
-              const { r1, c1, r2, c2 } = rangeRect;
-              for (let r = r1; r <= r2; r++) {
-                for (let c = c1; c <= c2; c++) {
-                  const covered = !model.getCell(r, c) && selectionService.renderer && selectionService.renderer.isCoveredByMerge(r, c);
-                  if (covered) continue;
-                  const cell = model.getCell(r, c);
-                  if (cell && cell.value !== '') model.setCellValue(r, c, '');
-                }
+          if (rangeRect) {
+            const { r1, c1, r2, c2 } = rangeRect;
+            for (let r = r1; r <= r2; r++) {
+              for (let c = c1; c <= c2; c++) {
+                const covered = !model.getCell(r, c) && selectionService.renderer && selectionService.renderer.isCoveredByMerge(r, c);
+                if (covered) continue;
+                const cell = model.getCell(r, c);
+                if (cell && cell.value !== '') model.setCellValue(r, c, '');
               }
-            } else if (sel) {
-              const cell = model.getCell(sel.r, sel.c);
-              if (cell && cell.value !== '') model.setCellValue(sel.r, sel.c, '');
             }
+          } else if (sel) {
+            const cell = model.getCell(sel.r, sel.c);
+            if (cell && cell.value !== '') model.setCellValue(sel.r, sel.c, '');
+          }
         }
         return;
       }
